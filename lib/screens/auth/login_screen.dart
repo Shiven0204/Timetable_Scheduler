@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:timetable_sceduler/widgets/custom_textfield.dart';
+import 'package:timetable_scheduler/widgets/custom_textfield.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});

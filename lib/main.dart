@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:timetable_sceduler/screens/auth/login_screen.dart';
+import 'package:timetable_scheduler/screens/auth/login_screen.dart';
 
 void main() {
   runApp(const MyApp());
