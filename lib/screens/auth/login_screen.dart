@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:timetable_sceduler/widgets/custom_textfield.dart';
+import 'package:timetable_scheduler/routes/app_routes.dart';
+import 'package:timetable_scheduler/widgets/custom_textfield.dart';
 
 class LoginScreen extends StatelessWidget {
   const LoginScreen({super.key});
@@ -7,6 +8,9 @@ class LoginScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('Login'),
+      ),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -35,7 +39,9 @@ class LoginScreen extends StatelessWidget {
                 SizedBox(
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.pushNamed(context, AppRoutes.dashboard);
+                    },
                     child: const Text('Login'),
                   ),
                 ),
