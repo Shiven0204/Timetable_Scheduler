@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:timetable_scheduler/routes/app_routes.dart';
 import 'package:timetable_scheduler/widgets/custom_textfield.dart';
 
 class LoginScreen extends StatelessWidget {
@@ -38,7 +39,9 @@ class LoginScreen extends StatelessWidget {
                 SizedBox(
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.pushNamed(context, AppRoutes.dashboard);
+                    },
                     child: const Text('Login'),
                   ),
                 ),
