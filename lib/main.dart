@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:timetable_scheduler/routes/app_routes.dart';
 import 'package:timetable_scheduler/screens/admin/add_department_screen.dart';
+import 'package:timetable_scheduler/screens/admin/add_faculty_screen.dart';
 import 'package:timetable_scheduler/screens/admin/add_program_screen.dart';
+import 'package:timetable_scheduler/screens/admin/add_room_screen.dart';
+import 'package:timetable_scheduler/screens/admin/add_subject_screen.dart';
 import 'package:timetable_scheduler/screens/admin/dashboard_screen.dart';
 import 'package:timetable_scheduler/screens/admin/timetable_config_screen.dart';
 import 'package:timetable_scheduler/screens/auth/login_screen.dart';
@@ -24,6 +27,9 @@ class MyApp extends StatelessWidget {
         AppRoutes.timetableConfig: (context) => const TimetableConfigScreen(),
         AppRoutes.addDepartment: (context) => const AddDepartmentScreen(),
         AppRoutes.addProgram: (context) => const AddProgramScreen(),
+        AppRoutes.addFaculty: (context) => const AddFacultyScreen(),
+        AppRoutes.addSubject: (context) => const AddSubjectScreen(),
+        AppRoutes.addRoom: (context) => const AddRoomScreen(),
       },
     );
   }

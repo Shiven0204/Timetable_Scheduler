@@ -36,6 +36,36 @@ class TimetableConfigScreen extends StatelessWidget {
                   child: const Text('Program'),
                 ),
               ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, AppRoutes.addFaculty);
+                  },
+                  child: const Text('Faculty'),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, AppRoutes.addSubject);
+                  },
+                  child: const Text('Subject'),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, AppRoutes.addRoom);
+                  },
+                  child: const Text('Room'),
+                ),
+              ),
             ],
           ),
         ),
