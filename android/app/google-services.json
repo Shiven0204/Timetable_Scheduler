@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "532974929194",
+    "project_id": "time-table-5148b",
+    "storage_bucket": "time-table-5148b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:532974929194:android:51ebefc75a4a7413b24a53",
+        "android_client_info": {
+          "package_name": "com.example.timetable_sceduler"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCIC5wIN6CL4NYRWd0MiNGpEOJg1sy80VI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:532974929194:android:9936ed729c1a271bb24a53",
+        "android_client_info": {
+          "package_name": "com.example.timetable_scheduler"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCIC5wIN6CL4NYRWd0MiNGpEOJg1sy80VI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

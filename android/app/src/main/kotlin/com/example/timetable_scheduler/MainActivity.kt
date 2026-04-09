@@ -1,4 +1,4 @@
-package com.example.timetable_sceduler
+package com.example.timetable_scheduler
 
 import io.flutter.embedding.android.FlutterActivity
 
