@@ -1,35 +1,63 @@
 # timetable_sceduler
 
-Minimal Flutter starter structure for a timetable scheduler app.
+Minimal Flutter app for timetable scheduling admin flow.
 
-## Current Setup
+## Current Features
 
-- Clean folder structure inside `lib`
-- Simple `LoginScreen` as app home
-- One reusable `CustomTextField` widget
-- No backend, no Firebase, no routing setup yet
+- Simple route-based navigation (no backend, no Firebase)
+- Login -> Dashboard -> Timetable Configuration flow
+- Admin setup screens:
+  - Add Department
+  - Add Program
+  - Add Faculty
+  - Add Subject
+  - Add Room
+- Form data is printed in console using local inputs only
 
-## Folder Structure
+## Navigation Flow
+
+```text
+Login
+  -> Dashboard
+      -> My Timetable (Timetable Configuration)
+          -> Department
+          -> Program
+          -> Faculty
+          -> Subject
+          -> Room
+```
+
+## Main Routes
+
+- `/login`
+- `/dashboard`
+- `/timetable_config`
+- `/add_department`
+- `/add_program`
+- `/add_faculty`
+- `/add_subject`
+- `/add_room`
+
+## Project Structure (Current)
 
 ```text
 lib/
-  core/
-    constants/
-    utils/
-    theme/
-  models/
-  services/
-  providers/
+  main.dart
+  routes/
+    app_routes.dart
   screens/
     auth/
       login_screen.dart
     admin/
-    student/
-    faculty/
+      dashboard_screen.dart
+      timetable_config_screen.dart
+      add_department_screen.dart
+      add_program_screen.dart
+      add_faculty_screen.dart
+      add_subject_screen.dart
+      add_room_screen.dart
   widgets/
     custom_textfield.dart
-  routes/
-  main.dart
 ```
 
 ## Run
