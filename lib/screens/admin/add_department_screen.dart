@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:timetable_scheduler/services/database_service.dart';
 
 class AddDepartmentScreen extends StatefulWidget {
   const AddDepartmentScreen({super.key});
@@ -8,7 +9,8 @@ class AddDepartmentScreen extends StatefulWidget {
 }
 
 class _AddDepartmentScreenState extends State<AddDepartmentScreen> {
-  final _nameController = TextEditingController();
+  final TextEditingController _nameController = TextEditingController();
+  final DatabaseService _dbService = DatabaseService();
 
   @override
   void dispose() {
@@ -16,10 +18,35 @@ class _AddDepartmentScreenState extends State<AddDepartmentScreen> {
     super.dispose();
   }
 
-  void _onSave() {
+  void _onSave() async {
     final name = _nameController.text.trim();
-    debugPrint('Department name: $name');
-    _nameController.clear();
+
+    // Validation
+    if (name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter department name')),
+      );
+      return;
+    }
+
+    try {
+      // Save to Firebase
+      await _dbService.saveDepartment(name);
+
+      // Success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Department saved')),
+      );
+
+      // Clear input
+      _nameController.clear();
+
+    } catch (e) {
+      // Error message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
   }
 
   @override
