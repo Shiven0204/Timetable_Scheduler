@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:timetable_scheduler/services/database_service.dart';
 
 class AddFacultyScreen extends StatefulWidget {
   const AddFacultyScreen({super.key});
@@ -8,41 +10,93 @@ class AddFacultyScreen extends StatefulWidget {
 }
 
 class _AddFacultyScreenState extends State<AddFacultyScreen> {
-  static const _departments = ['Tech', 'Science', 'Management'];
-
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _phoneController = TextEditingController();
   final _expertiseController = TextEditingController();
-  String? _department;
+  final _maxLecturesController = TextEditingController();
+
+  final DatabaseService _dbService = DatabaseService();
+
+  String? _selectedDepartmentId;
+  List<Map<String, dynamic>> _departments = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDepartments();
+  }
+
+  Future<void> _loadDepartments() async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('Department')
+        .get();
+
+    setState(() {
+      _departments = snapshot.docs.map((doc) {
+        return {'id': doc.id, 'name': doc['dept_name']};
+      }).toList();
+    });
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();
-    _phoneController.dispose();
     _expertiseController.dispose();
+    _maxLecturesController.dispose();
     super.dispose();
   }
 
-  void _onSave() {
+  void _onSave() async {
     final name = _nameController.text.trim();
     final email = _emailController.text.trim();
-    final phone = _phoneController.text.trim();
-    final expertise = _expertiseController.text.trim();
-    final department = _department ?? '(none selected)';
+    final expertiseText = _expertiseController.text.trim();
+    final maxLecturesText = _maxLecturesController.text.trim();
 
-    debugPrint(
-      'Faculty: $name | Email: $email | Phone: $phone | Expertise: $expertise | Department: $department',
-    );
+    if (name.isEmpty ||
+        email.isEmpty ||
+        expertiseText.isEmpty ||
+        maxLecturesText.isEmpty ||
+        _selectedDepartmentId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Fill all fields')));
+      return;
+    }
 
-    _nameController.clear();
-    _emailController.clear();
-    _phoneController.clear();
-    _expertiseController.clear();
-    setState(() {
-      _department = null;
-    });
+    try {
+      List<String> expertiseList = expertiseText
+          .split(',')
+          .map((e) => e.trim())
+          .toList();
+
+      int maxLectures = int.tryParse(maxLecturesText) ?? 0;
+
+      await _dbService.saveFaculty(
+        facultyName: name,
+        email: email,
+        expertise: expertiseList,
+        maxLecturesPerDay: maxLectures,
+        departmentId: _selectedDepartmentId!,
+      );
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Faculty saved')));
+
+      _nameController.clear();
+      _emailController.clear();
+      _expertiseController.clear();
+      _maxLecturesController.clear();
+
+      setState(() {
+        _selectedDepartmentId = null;
+      });
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
   }
 
   InputDecoration _decoration(String label) {
@@ -55,9 +109,7 @@ class _AddFacultyScreenState extends State<AddFacultyScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Add Faculty'),
-      ),
+      appBar: AppBar(title: const Text('Add Faculty')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -68,47 +120,51 @@ class _AddFacultyScreenState extends State<AddFacultyScreen> {
               decoration: _decoration('Faculty Name'),
             ),
             const SizedBox(height: 16),
+
             TextField(
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
               decoration: _decoration('Email'),
             ),
             const SizedBox(height: 16),
-            TextField(
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              decoration: _decoration('Phone Number'),
-            ),
-            const SizedBox(height: 16),
+
             TextField(
               controller: _expertiseController,
               decoration: _decoration('Expertise (comma separated)'),
             ),
             const SizedBox(height: 16),
+
+            TextField(
+              controller: _maxLecturesController,
+              keyboardType: TextInputType.number,
+              decoration: _decoration('Max Lectures Per Day'),
+            ),
+            const SizedBox(height: 16),
+
             InputDecorator(
               decoration: _decoration('Department'),
               child: DropdownButtonHideUnderline(
                 child: DropdownButton<String>(
                   isExpanded: true,
-                  value: _department,
+                  value: _selectedDepartmentId,
                   hint: const Text('Select department'),
-                  items: _departments
-                      .map(
-                        (d) => DropdownMenuItem(
-                          value: d,
-                          child: Text(d),
-                        ),
-                      )
-                      .toList(),
+                  items: _departments.map<DropdownMenuItem<String>>((d) {
+                    return DropdownMenuItem<String>(
+                      value: d['id'],
+                      child: Text(d['name']),
+                    );
+                  }).toList(),
                   onChanged: (value) {
                     setState(() {
-                      _department = value;
+                      _selectedDepartmentId = value;
                     });
                   },
                 ),
               ),
             ),
+
             const SizedBox(height: 24),
+
             SizedBox(
               height: 48,
               child: ElevatedButton(
@@ -122,4 +178,3 @@ class _AddFacultyScreenState extends State<AddFacultyScreen> {
     );
   }
 }
-

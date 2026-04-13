@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-// Department Collection Reference
+  // Department Collection Reference
 
   Future<void> saveDepartment(String name) async {
     try {
@@ -16,23 +16,21 @@ class DatabaseService {
       });
 
       print("✅ Department saved successfully");
-
     } catch (e) {
       print("❌ Error saving department: $e");
       rethrow;
     }
   }
-// Program Collection Reference
+  // Program Collection Reference
+
   Future<void> saveProgram({
     required String programName,
     required String branchName,
     required int year,
-    required String departmentId, // 🔥 doc.id reference
+    required String departmentId,
   }) async {
     try {
-      if (programName.isEmpty ||
-          branchName.isEmpty ||
-          departmentId.isEmpty) {
+      if (programName.isEmpty || branchName.isEmpty || departmentId.isEmpty) {
         throw Exception("Fields cannot be empty");
       }
 
@@ -40,14 +38,42 @@ class DatabaseService {
         'program_name': programName,
         'branch_name': branchName,
         'year': year,
-        'department_id': departmentId, // 🔥 linking happens here
+        'department_id': departmentId,
         'created_at': FieldValue.serverTimestamp(),
       });
 
       print("✅ Program saved successfully");
-
     } catch (e) {
       print("❌ Error saving program: $e");
+      rethrow;
+    }
+  }
+
+// Faculty Collection Reference
+  Future<void> saveFaculty({
+    required String facultyName,
+    required String email,
+    required List<String> expertise,
+    required int maxLecturesPerDay,
+    required String departmentId,
+  }) async {
+    try {
+      if (facultyName.isEmpty || email.isEmpty || departmentId.isEmpty) {
+        throw Exception("Fields cannot be empty");
+      }
+
+      await _db.collection('Faculty').add({
+        'faculty_name': facultyName,
+        'email': email,
+        'expertise': expertise,
+        'max_lectures_per_day': maxLecturesPerDay,
+        'department_id': departmentId,
+        'created_at': FieldValue.serverTimestamp(),
+      });
+
+      print("✅ Faculty saved successfully");
+    } catch (e) {
+      print("❌ Error saving faculty: $e");
       rethrow;
     }
   }
