@@ -11,6 +11,7 @@ import 'package:timetable_scheduler/screens/admin/add_subject_screen.dart';
 import 'package:timetable_scheduler/screens/admin/dashboard_screen.dart';
 import 'package:timetable_scheduler/screens/admin/timetable_config_screen.dart';
 import 'package:timetable_scheduler/screens/auth/login_screen.dart';
+import 'package:timetable_scheduler/screens/admin/add_mapping_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,6 +40,7 @@ class MyApp extends StatelessWidget {
         AppRoutes.addFaculty: (context) => const AddFacultyScreen(),
         AppRoutes.addSubject: (context) => const AddSubjectScreen(),
         AppRoutes.addRoom: (context) => const AddRoomScreen(),
+        AppRoutes.addMapping: (context) => const AddMappingScreen(),
       },
     );
   }

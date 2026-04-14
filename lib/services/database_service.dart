@@ -108,4 +108,27 @@ class DatabaseService {
       rethrow;
     }
   }
+
+  //Mapping Collection Reference
+
+  Future<void> saveMapping({
+  required String facultyId,
+  required String subjectId,
+  required String programId,
+}) async {
+  try {
+    await _db.collection('Mappings').add({
+      'faculty_id': facultyId,
+      'subject_id': subjectId,
+      'program_id': programId,
+      'created_at': FieldValue.serverTimestamp(),
+    });
+
+    print("✅ Mapping saved");
+
+  } catch (e) {
+    print("❌ Error saving mapping: $e");
+    rethrow;
+  }
+}
 }
