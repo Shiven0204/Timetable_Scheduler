@@ -10,9 +10,9 @@ class AddProgramScreen extends StatefulWidget {
 }
 
 class _AddProgramScreenState extends State<AddProgramScreen> {
+
   final _programNameController = TextEditingController();
   final _branchController = TextEditingController();
-  final _yearController = TextEditingController();
 
   final DatabaseService _dbService = DatabaseService();
 
@@ -27,13 +27,13 @@ class _AddProgramScreenState extends State<AddProgramScreen> {
 
   Future<void> _loadDepartments() async {
     final snapshot = await FirebaseFirestore.instance
-        .collection('Department')
+        .collection('Department') 
         .get();
 
     setState(() {
       _departments = snapshot.docs.map((doc) {
         return {
-          'id': doc.id, // 🔥 doc.id
+          'id': doc.id,
           'name': doc['dept_name'],
         };
       }).toList();
@@ -44,70 +44,68 @@ class _AddProgramScreenState extends State<AddProgramScreen> {
   void dispose() {
     _programNameController.dispose();
     _branchController.dispose();
-    _yearController.dispose();
     super.dispose();
   }
 
   void _onSave() async {
     final programName = _programNameController.text.trim();
     final branch = _branchController.text.trim();
-    final yearText = _yearController.text.trim();
 
     if (programName.isEmpty ||
         branch.isEmpty ||
-        yearText.isEmpty ||
         _selectedDepartmentId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Fill all fields')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Fill all fields')),
+      );
       return;
     }
 
     try {
-      int year = int.parse(yearText);
-
       await _dbService.saveProgram(
         programName: programName,
         branchName: branch,
-        year: year,
-        departmentId: _selectedDepartmentId!, // 🔥 mapping
+        departmentId: _selectedDepartmentId!,
       );
 
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Program saved')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Program saved')),
+      );
 
       _programNameController.clear();
       _branchController.clear();
-      _yearController.clear();
 
       setState(() {
         _selectedDepartmentId = null;
       });
+
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Program')),
+      appBar: AppBar(
+        title: const Text('Add Program'),
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+
             TextField(
               controller: _programNameController,
               decoration: const InputDecoration(
-                labelText: 'Program Name',
+                labelText: 'Program Name (include year)',
                 border: OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 16),
+
             TextField(
               controller: _branchController,
               decoration: const InputDecoration(
@@ -116,17 +114,7 @@ class _AddProgramScreenState extends State<AddProgramScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            TextField(
-              controller: _yearController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Year',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
 
-            // 🔥 SAME UI STYLE (just dynamic data)
             InputDecorator(
               decoration: const InputDecoration(
                 labelText: 'Department',
@@ -139,7 +127,7 @@ class _AddProgramScreenState extends State<AddProgramScreen> {
                   hint: const Text('Select department'),
                   items: _departments.map<DropdownMenuItem<String>>((d) {
                     return DropdownMenuItem<String>(
-                      value: d['id'], // doc.id
+                      value: d['id'],
                       child: Text(d['name']),
                     );
                   }).toList(),

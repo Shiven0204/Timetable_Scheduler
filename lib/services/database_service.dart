@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+
   // Department Collection Reference
 
   Future<void> saveDepartment(String name) async {
@@ -21,35 +22,37 @@ class DatabaseService {
       rethrow;
     }
   }
+
   // Program Collection Reference
 
   Future<void> saveProgram({
-    required String programName,
-    required String branchName,
-    required int year,
-    required String departmentId,
-  }) async {
-    try {
-      if (programName.isEmpty || branchName.isEmpty || departmentId.isEmpty) {
-        throw Exception("Fields cannot be empty");
-      }
-
-      await _db.collection('Programs').add({
-        'program_name': programName,
-        'branch_name': branchName,
-        'year': year,
-        'department_id': departmentId,
-        'created_at': FieldValue.serverTimestamp(),
-      });
-
-      print("✅ Program saved successfully");
-    } catch (e) {
-      print("❌ Error saving program: $e");
-      rethrow;
+  required String programName,
+  required String branchName,
+  required String departmentId,
+}) async {
+  try {
+    if (programName.isEmpty ||
+        branchName.isEmpty ||
+        departmentId.isEmpty) {
+      throw Exception("Fields cannot be empty");
     }
-  }
+    await _db.collection('Programs').add({
+      'program_name': programName,
+      'branch_name': branchName,
+      'department_id': departmentId,
+      'created_at': FieldValue.serverTimestamp(),
+    });
 
-// Faculty Collection Reference
+
+    print("✅ Program saved successfully");
+  } catch (e) {
+    print("❌ Error saving program: $e");
+    rethrow;
+  }
+}
+
+  // Faculty Collection Reference
+
   Future<void> saveFaculty({
     required String facultyName,
     required String email,
@@ -74,6 +77,34 @@ class DatabaseService {
       print("✅ Faculty saved successfully");
     } catch (e) {
       print("❌ Error saving faculty: $e");
+      rethrow;
+    }
+  }
+
+  // Subject Collection Reference
+
+  Future<void> saveSubject({
+    required String subjectName,
+    required int credits,
+    required bool isLab,
+    required String programId,
+  }) async {
+    try {
+      if (subjectName.isEmpty || programId.isEmpty) {
+        throw Exception("Fields cannot be empty");
+      }
+
+      await _db.collection('Subjects').add({
+        'subject_name': subjectName,
+        'credits': credits,
+        'is_lab': isLab,
+        'program_id': programId,
+        'created_at': FieldValue.serverTimestamp(),
+      });
+
+      print("✅ Subject saved successfully");
+    } catch (e) {
+      print("❌ Error saving subject: $e");
       rethrow;
     }
   }
