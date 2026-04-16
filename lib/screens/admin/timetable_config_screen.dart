@@ -66,6 +66,16 @@ class TimetableConfigScreen extends StatelessWidget {
                   child: const Text('Room'),
                 ),
               ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, AppRoutes.addMapping);
+                  },
+                  child: const Text('Mapping'),
+                ),
+              ),
             ],
           ),
         ),

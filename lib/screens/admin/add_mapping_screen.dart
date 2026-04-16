@@ -29,13 +29,13 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
 
   Future<void> _loadAllData() async {
     final facultySnap =
-        await FirebaseFirestore.instance.collection('faculty').get();
+        await FirebaseFirestore.instance.collection('Faculty').get();
 
     final subjectSnap =
-        await FirebaseFirestore.instance.collection('subjects').get();
+        await FirebaseFirestore.instance.collection('Subjects').get();
 
     final programSnap =
-        await FirebaseFirestore.instance.collection('programs').get();
+        await FirebaseFirestore.instance.collection('Programs').get();
 
     setState(() {
       _faculties = facultySnap.docs.map((doc) {
