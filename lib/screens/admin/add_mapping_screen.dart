@@ -10,7 +10,6 @@ class AddMappingScreen extends StatefulWidget {
 }
 
 class _AddMappingScreenState extends State<AddMappingScreen> {
-
   final DatabaseService _dbService = DatabaseService();
 
   String? _selectedFacultyId;
@@ -28,28 +27,17 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
   }
 
   Future<void> _loadAllData() async {
-    final facultySnap =
-        await FirebaseFirestore.instance.collection('Faculty').get();
+    final facultySnap = await FirebaseFirestore.instance
+        .collection('Faculty')
+        .get();
 
-    final subjectSnap =
-        await FirebaseFirestore.instance.collection('Subjects').get();
-
-    final programSnap =
-        await FirebaseFirestore.instance.collection('Programs').get();
+    final programSnap = await FirebaseFirestore.instance
+        .collection('Programs')
+        .get();
 
     setState(() {
       _faculties = facultySnap.docs.map((doc) {
-        return {
-          'id': doc.id,
-          'name': doc['faculty_name'],
-        };
-      }).toList();
-
-      _subjects = subjectSnap.docs.map((doc) {
-        return {
-          'id': doc.id,
-          'name': doc['subject_name'],
-        };
+        return {'id': doc.id, 'name': doc['faculty_name']};
       }).toList();
 
       _programs = programSnap.docs.map((doc) {
@@ -59,6 +47,21 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
           'branch_name': doc['branch_name'],
         };
       }).toList();
+
+      _subjects = [];
+    });
+  }
+
+  Future<void> _loadSubjectsByProgram(String programId) async {
+    final snapshot = await FirebaseFirestore.instance
+        .collection('Subjects')
+        .where('program_id', isEqualTo: programId)
+        .get();
+
+    setState(() {
+      _subjects = snapshot.docs.map((doc) {
+        return {'id': doc.id, 'name': doc['subject_name']};
+      }).toList();
     });
   }
 
@@ -66,9 +69,9 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
     if (_selectedFacultyId == null ||
         _selectedSubjectId == null ||
         _selectedProgramId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select all fields')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Select all fields')));
       return;
     }
 
@@ -79,20 +82,19 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
         programId: _selectedProgramId!,
       );
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Mapping saved')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Mapping saved')));
 
       setState(() {
         _selectedFacultyId = null;
         _selectedSubjectId = null;
         _selectedProgramId = null;
       });
-
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
@@ -137,7 +139,6 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-
             _buildDropdown(
               label: 'Faculty',
               value: _selectedFacultyId,
@@ -168,13 +169,18 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
                   items: _programs.map<DropdownMenuItem<String>>((p) {
                     return DropdownMenuItem<String>(
                       value: p['id'],
-                      child: Text(
-                        "${p['program_name']} - ${p['branch_name']}"
-                      ),
+                      child: Text("${p['program_name']} - ${p['branch_name']}"),
                     );
                   }).toList(),
-                  onChanged: (val) =>
-                      setState(() => _selectedProgramId = val),
+                  onChanged: (val) {
+                    setState(() {
+                      _selectedProgramId = val;
+                      _selectedSubjectId = null;
+                      _subjects = [];
+                    });
+
+                    _loadSubjectsByProgram(val!);
+                  },
                 ),
               ),
             ),

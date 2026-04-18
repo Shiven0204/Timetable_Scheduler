@@ -131,4 +131,28 @@ class DatabaseService {
     rethrow;
   }
 }
+
+// Room Collection Reference
+
+Future<void> saveRoom({
+  required String roomName,
+  required String roomType,
+}) async {
+  try {
+    if (roomName.isEmpty || roomType.isEmpty) {
+      throw Exception("Fields cannot be empty");
+    }
+
+    await _db.collection('Rooms').add({
+      'room_name': roomName,
+      'room_type': roomType,
+      'created_at': FieldValue.serverTimestamp(),
+    });
+
+    print("✅ Room saved successfully");
+  } catch (e) {
+    print("❌ Error saving room: $e");
+    rethrow;
+  }
+}
 }
