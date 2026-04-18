@@ -1,8 +1,46 @@
 import 'package:flutter/material.dart';
 import 'package:timetable_scheduler/routes/app_routes.dart';
+import 'package:timetable_scheduler/services/timetable_service.dart';
 
-class TimetableConfigScreen extends StatelessWidget {
+class TimetableConfigScreen extends StatefulWidget {
   const TimetableConfigScreen({super.key});
+
+  @override
+  State<TimetableConfigScreen> createState() => _TimetableConfigScreenState();
+}
+
+class _TimetableConfigScreenState extends State<TimetableConfigScreen> {
+  final TimetableService _timetableService = TimetableService();
+  bool _isGenerating = false;
+
+  Future<void> _generateTimetable() async {
+    setState(() {
+      _isGenerating = true;
+    });
+
+    try {
+      await _timetableService.generateTimetable();
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Timetable generated successfully')),
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to generate timetable')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGenerating = false;
+        });
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -64,6 +102,20 @@ class TimetableConfigScreen extends StatelessWidget {
                     Navigator.pushNamed(context, AppRoutes.addRoom);
                   },
                   child: const Text('Room'),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: _isGenerating ? null : _generateTimetable,
+                  child: _isGenerating
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Generate Timetable'),
                 ),
               ),
             ],
