@@ -108,13 +108,23 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen> {
               SizedBox(
                 height: 48,
                 child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, AppRoutes.addMapping);
+                  },
+                  child: const Text('Mapping'),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 48,
+                child: ElevatedButton(
                   onPressed: _isGenerating ? null : _generateTimetable,
                   child: _isGenerating
                       ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
                       : const Text('Generate Timetable'),
                 ),
               ),

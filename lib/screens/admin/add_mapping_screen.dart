@@ -29,13 +29,17 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
 
   Future<void> _loadAllData() async {
     final facultySnap =
-        await FirebaseFirestore.instance.collection('faculty').get();
+    await FirebaseFirestore.instance.collection('Faculty').get();
 
     final subjectSnap =
-        await FirebaseFirestore.instance.collection('subjects').get();
+    await FirebaseFirestore.instance.collection('Subjects').get();
 
     final programSnap =
-        await FirebaseFirestore.instance.collection('programs').get();
+    await FirebaseFirestore.instance.collection('Programs').get();
+
+    if (!mounted) {
+      return;
+    }
 
     setState(() {
       _faculties = facultySnap.docs.map((doc) {
@@ -79,6 +83,10 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
         programId: _selectedProgramId!,
       );
 
+      if (!mounted) {
+        return;
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Mapping saved')),
       );
@@ -90,6 +98,9 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
       });
 
     } catch (e) {
+      if (!mounted) {
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );
@@ -169,7 +180,7 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
                     return DropdownMenuItem<String>(
                       value: p['id'],
                       child: Text(
-                        "${p['program_name']} - ${p['branch_name']}"
+                          "${p['program_name']} - ${p['branch_name']}"
                       ),
                     );
                   }).toList(),

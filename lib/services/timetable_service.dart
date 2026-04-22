@@ -17,11 +17,12 @@ class TimetableService {
       throw Exception('Missing programs or rooms');
     }
 
-    final Map<String, Map<int, Set<int>>> facultySchedule = {};
-    final Map<String, Map<int, Set<int>>> roomSchedule = {};
+    final facultySchedule = <String, Map<int, Set<int>>>{};
+    final roomSchedule = <String, Map<int, Set<int>>>{};
+    final rowsToWrite = <Map<String, dynamic>>[];
 
-    final List<Map<String, dynamic>> writeRows = [];
-    final timetable = <String, Map<int, List<Map<String, String>>>>{};
+    final days = config['working_days']!;
+    final periods = config['periods']!;
 
     for (final program in programs) {
       final programId = program.id;
@@ -34,17 +35,13 @@ class TimetableService {
       }
 
       final tasks = _buildTasks(programSubjects);
-      final labs = tasks.where((t) => t['is_lab'] == true).toList();
-      final theories = tasks.where((t) => t['is_lab'] != true).toList();
+      final labTasks = tasks.where((t) => t.isLab).toList();
+      final theoryTasks = tasks.where((t) => !t.isLab).toList();
 
-      final days = config['working_days'] as int;
-      final periods = config['periods'] as int;
       final grid = _createEmptyGrid(days: days, periods: periods);
 
-      final usedSlots = <String>{};
-
-      for (final task in labs) {
-        final assigned = _assignLabTask(
+      for (final task in labTasks) {
+        final ok = _placeLab(
           task: task,
           days: days,
           periods: periods,
@@ -53,15 +50,14 @@ class TimetableService {
           rooms: rooms,
           facultySchedule: facultySchedule,
           roomSchedule: roomSchedule,
-          usedSlots: usedSlots,
         );
-        if (!assigned) {
-          throw Exception('Unable to place all lab slots');
+        if (!ok) {
+          throw Exception('Unable to generate timetable (lab placement failed)');
         }
       }
 
-      for (final task in theories) {
-        final assigned = _assignTheoryTask(
+      for (final task in theoryTasks) {
+        final ok = _placeTheory(
           task: task,
           days: days,
           periods: periods,
@@ -70,133 +66,109 @@ class TimetableService {
           rooms: rooms,
           facultySchedule: facultySchedule,
           roomSchedule: roomSchedule,
-          usedSlots: usedSlots,
         );
-        if (!assigned) {
-          throw Exception('Unable to place all theory slots');
+        if (!ok) {
+          throw Exception(
+            'Unable to generate timetable (theory placement failed)',
+          );
         }
       }
-
-      timetable[programId] = grid;
 
       for (var day = 0; day < days; day++) {
-        final slots = grid[day] ?? [];
-        for (var period = 0; period < slots.length; period++) {
-          final slot = slots[period];
-          final subjectId = slot['subject_id'] ?? '';
-          if (subjectId.isEmpty) {
+        for (var period = 0; period < periods; period++) {
+          final slot = grid[day]![period];
+          if (slot.subjectId.isEmpty) {
             continue;
           }
-
-          writeRows.add({
+          rowsToWrite.add({
             'program_id': programId,
             'day': day,
             'period': period,
-            'subject_id': subjectId,
-            'faculty_id': slot['faculty_id'],
-            'room_id': slot['room_id'],
+            'subject_id': slot.subjectId,
+            'faculty_id': slot.facultyId,
+            'room_id': slot.roomId,
             'created_at': FieldValue.serverTimestamp(),
           });
         }
       }
     }
 
-    if (writeRows.isEmpty) {
+    if (rowsToWrite.isEmpty) {
       throw Exception('No timetable rows generated');
     }
 
-    await _saveTimetable(writeRows);
+    await _saveTimetable(rowsToWrite);
   }
 
-  List<Map<String, dynamic>> _buildTasks(
-    List<QueryDocumentSnapshot<Map<String, dynamic>>> subjects,
-  ) {
-    final tasks = <Map<String, dynamic>>[];
-
+  List<_Task> _buildTasks(
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> subjects,
+      ) {
+    final tasks = <_Task>[];
     for (final subject in subjects) {
       final data = subject.data();
-      final subjectId = subject.id;
       final credits = (data['credits'] as num?)?.toInt() ?? 0;
       final isLab = data['is_lab'] == true;
-      final taskCount = isLab ? credits : credits;
-
-      for (var i = 0; i < taskCount; i++) {
-        tasks.add({
-          'subject_id': subjectId,
-          'is_lab': isLab,
-          'needs_double_slot': isLab,
-        });
+      final count = credits;
+      for (var i = 0; i < count; i++) {
+        tasks.add(_Task(subjectId: subject.id, isLab: isLab));
       }
     }
-
     return tasks;
   }
 
-  Map<int, List<Map<String, String>>> _createEmptyGrid({
+  Map<int, List<_Slot>> _createEmptyGrid({
     required int days,
     required int periods,
   }) {
-    final grid = <int, List<Map<String, String>>>{};
+    final grid = <int, List<_Slot>>{};
     for (var d = 0; d < days; d++) {
-      grid[d] = List.generate(periods, (_) => <String, String>{});
+      grid[d] = List.generate(periods, (_) => const _Slot.empty());
     }
     return grid;
   }
 
-  bool _assignLabTask({
-    required Map<String, dynamic> task,
+  bool _placeLab({
+    required _Task task,
     required int days,
     required int periods,
-    required Map<int, List<Map<String, String>>> grid,
+    required Map<int, List<_Slot>> grid,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> mappings,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> rooms,
     required Map<String, Map<int, Set<int>>> facultySchedule,
     required Map<String, Map<int, Set<int>>> roomSchedule,
-    required Set<String> usedSlots,
   }) {
-    final match = _findMappingForSubject(
-      mappings: mappings,
-      subjectId: task['subject_id'] as String,
-    );
-    if (match == null) {
-      return false;
-    }
+    final mapping = _findMapping(mappings, task.subjectId);
+    if (mapping == null) return false;
 
-    final facultyId = match['faculty_id'] as String;
-    final roomId = _pickRoom(rooms) ?? '';
-    if (roomId.isEmpty) {
-      return false;
-    }
+    final facultyId = mapping['faculty_id'] as String? ?? '';
+    final roomId = rooms.first.id;
+    if (facultyId.isEmpty) return false;
 
     for (var day = 0; day < days; day++) {
       for (var period = 0; period < periods - 1; period++) {
-        final keyA = '$day-$period';
-        final keyB = '$day-${period + 1}';
-        if (usedSlots.contains(keyA) || usedSlots.contains(keyB)) {
+        if (!grid[day]![period].isEmpty || !grid[day]![period + 1].isEmpty) {
           continue;
         }
-        if (_isFacultyBusy(facultySchedule, facultyId, day, period) ||
-            _isFacultyBusy(facultySchedule, facultyId, day, period + 1)) {
+        if (_isBusy(facultySchedule, facultyId, day, period) ||
+            _isBusy(facultySchedule, facultyId, day, period + 1)) {
           continue;
         }
-        if (_isRoomBusy(roomSchedule, roomId, day, period) ||
-            _isRoomBusy(roomSchedule, roomId, day, period + 1)) {
+        if (_isBusy(roomSchedule, roomId, day, period) ||
+            _isBusy(roomSchedule, roomId, day, period + 1)) {
           continue;
         }
 
-        grid[day]![period] = {
-          'subject_id': task['subject_id'] as String,
-          'faculty_id': facultyId,
-          'room_id': roomId,
-        };
-        grid[day]![period + 1] = {
-          'subject_id': task['subject_id'] as String,
-          'faculty_id': facultyId,
-          'room_id': roomId,
-        };
+        grid[day]![period] = _Slot(
+          subjectId: task.subjectId,
+          facultyId: facultyId,
+          roomId: roomId,
+        );
+        grid[day]![period + 1] = _Slot(
+          subjectId: task.subjectId,
+          facultyId: facultyId,
+          roomId: roomId,
+        );
 
-        usedSlots.add(keyA);
-        usedSlots.add(keyB);
         _markBusy(facultySchedule, facultyId, day, period);
         _markBusy(facultySchedule, facultyId, day, period + 1);
         _markBusy(roomSchedule, roomId, day, period);
@@ -207,51 +179,35 @@ class TimetableService {
     return false;
   }
 
-  bool _assignTheoryTask({
-    required Map<String, dynamic> task,
+  bool _placeTheory({
+    required _Task task,
     required int days,
     required int periods,
-    required Map<int, List<Map<String, String>>> grid,
+    required Map<int, List<_Slot>> grid,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> mappings,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> rooms,
     required Map<String, Map<int, Set<int>>> facultySchedule,
     required Map<String, Map<int, Set<int>>> roomSchedule,
-    required Set<String> usedSlots,
   }) {
-    final match = _findMappingForSubject(
-      mappings: mappings,
-      subjectId: task['subject_id'] as String,
-    );
-    if (match == null) {
-      return false;
-    }
+    final mapping = _findMapping(mappings, task.subjectId);
+    if (mapping == null) return false;
 
-    final facultyId = match['faculty_id'] as String;
-    final roomId = _pickRoom(rooms) ?? '';
-    if (roomId.isEmpty) {
-      return false;
-    }
+    final facultyId = mapping['faculty_id'] as String? ?? '';
+    final roomId = rooms.first.id;
+    if (facultyId.isEmpty) return false;
 
     for (var day = 0; day < days; day++) {
       for (var period = 0; period < periods; period++) {
-        final key = '$day-$period';
-        if (usedSlots.contains(key)) {
-          continue;
-        }
-        if (_isFacultyBusy(facultySchedule, facultyId, day, period)) {
-          continue;
-        }
-        if (_isRoomBusy(roomSchedule, roomId, day, period)) {
-          continue;
-        }
+        if (!grid[day]![period].isEmpty) continue;
+        if (_isBusy(facultySchedule, facultyId, day, period)) continue;
+        if (_isBusy(roomSchedule, roomId, day, period)) continue;
 
-        grid[day]![period] = {
-          'subject_id': task['subject_id'] as String,
-          'faculty_id': facultyId,
-          'room_id': roomId,
-        };
+        grid[day]![period] = _Slot(
+          subjectId: task.subjectId,
+          facultyId: facultyId,
+          roomId: roomId,
+        );
 
-        usedSlots.add(key);
         _markBusy(facultySchedule, facultyId, day, period);
         _markBusy(roomSchedule, roomId, day, period);
         return true;
@@ -260,10 +216,10 @@ class TimetableService {
     return false;
   }
 
-  Map<String, dynamic>? _findMappingForSubject({
-    required List<QueryDocumentSnapshot<Map<String, dynamic>>> mappings,
-    required String subjectId,
-  }) {
+  Map<String, dynamic>? _findMapping(
+      List<QueryDocumentSnapshot<Map<String, dynamic>>> mappings,
+      String subjectId,
+      ) {
     for (final m in mappings) {
       final data = m.data();
       if ((data['subject_id'] ?? '') == subjectId) {
@@ -273,37 +229,21 @@ class TimetableService {
     return null;
   }
 
-  String? _pickRoom(List<QueryDocumentSnapshot<Map<String, dynamic>>> rooms) {
-    if (rooms.isEmpty) {
-      return null;
-    }
-    return rooms.first.id;
-  }
-
-  bool _isFacultyBusy(
-    Map<String, Map<int, Set<int>>> schedule,
-    String facultyId,
-    int day,
-    int period,
-  ) {
-    return schedule[facultyId]?[day]?.contains(period) == true;
-  }
-
-  bool _isRoomBusy(
-    Map<String, Map<int, Set<int>>> schedule,
-    String roomId,
-    int day,
-    int period,
-  ) {
-    return schedule[roomId]?[day]?.contains(period) == true;
+  bool _isBusy(
+      Map<String, Map<int, Set<int>>> schedule,
+      String id,
+      int day,
+      int period,
+      ) {
+    return schedule[id]?[day]?.contains(period) == true;
   }
 
   void _markBusy(
-    Map<String, Map<int, Set<int>>> schedule,
-    String id,
-    int day,
-    int period,
-  ) {
+      Map<String, Map<int, Set<int>>> schedule,
+      String id,
+      int day,
+      int period,
+      ) {
     schedule.putIfAbsent(id, () => <int, Set<int>>{});
     schedule[id]!.putIfAbsent(day, () => <int>{});
     schedule[id]![day]!.add(period);
@@ -322,8 +262,7 @@ class TimetableService {
   }
 
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _fetchRooms() async {
-    final roomCandidates = ['Rooms', 'Room', 'rooms'];
-    for (final name in roomCandidates) {
+    for (final name in const ['Rooms', 'Room', 'rooms']) {
       final snap = await _db.collection(name).get();
       if (snap.docs.isNotEmpty) {
         return snap.docs;
@@ -333,14 +272,11 @@ class TimetableService {
   }
 
   Future<Map<String, int>> _fetchConfig() async {
-    final defaults = {'working_days': 5, 'periods': 6};
-    final configCandidates = [
+    for (final candidate in const [
       {'collection': 'config', 'doc': 'timetable'},
       {'collection': 'Config', 'doc': 'timetable'},
       {'collection': 'timetable_config', 'doc': 'default'},
-    ];
-
-    for (final candidate in configCandidates) {
+    ]) {
       final doc = await _db
           .collection(candidate['collection']!)
           .doc(candidate['doc']!)
@@ -353,8 +289,7 @@ class TimetableService {
         };
       }
     }
-
-    return defaults;
+    return {'working_days': 5, 'periods': 6};
   }
 
   Future<void> _saveTimetable(List<Map<String, dynamic>> rows) async {
@@ -367,12 +302,35 @@ class TimetableService {
       await deleteBatch.commit();
     }
 
-    final writeBatch = _db.batch();
+    final batch = _db.batch();
     for (final row in rows) {
-      final ref = _db.collection('timetable').doc();
-      writeBatch.set(ref, row);
+      batch.set(_db.collection('timetable').doc(), row);
     }
-    await writeBatch.commit();
+    await batch.commit();
   }
 }
 
+class _Task {
+  const _Task({required this.subjectId, required this.isLab});
+  final String subjectId;
+  final bool isLab;
+}
+
+class _Slot {
+  const _Slot({
+    required this.subjectId,
+    required this.facultyId,
+    required this.roomId,
+  });
+
+  const _Slot.empty()
+      : subjectId = '',
+        facultyId = '',
+        roomId = '';
+
+  final String subjectId;
+  final String facultyId;
+  final String roomId;
+
+  bool get isEmpty => subjectId.isEmpty;
+}
