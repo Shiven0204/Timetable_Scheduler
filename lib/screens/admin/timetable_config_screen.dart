@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:timetable_scheduler/services/timetable_service.dart';
 
 class TimetableConfigScreen extends StatefulWidget {
   const TimetableConfigScreen({super.key});
@@ -9,12 +10,14 @@ class TimetableConfigScreen extends StatefulWidget {
 }
 
 class _TimetableConfigScreenState extends State<TimetableConfigScreen> {
+  final TimetableService _timetableService = TimetableService();
   final _workingDaysController = TextEditingController(text: '5');
   final _periodsPerDayController = TextEditingController(text: '6');
   final _durationController = TextEditingController(text: '50');
   final _maxLecturesController = TextEditingController(text: '4');
 
   bool _saving = false;
+  bool _preparing = false;
 
   @override
   void dispose() {
@@ -66,6 +69,31 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen> {
       if (mounted) {
         setState(() {
           _saving = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _prepareData() async {
+    setState(() {
+      _preparing = true;
+    });
+
+    try {
+      await _timetableService.prepareTimetableData();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Data Prepared')));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to prepare data')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _preparing = false;
         });
       }
     }
@@ -124,6 +152,20 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Text('Save Configuration'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _preparing ? null : _prepareData,
+                child: _preparing
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Prepare Data'),
               ),
             ),
           ],

@@ -1,10 +1,170 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:developer' as dev;
 
 class TimetableService {
   TimetableService({FirebaseFirestore? firestore})
       : _db = firestore ?? FirebaseFirestore.instance;
 
   final FirebaseFirestore _db;
+
+  static const List<String> _programCollections = ['programs', 'Programs'];
+  static const List<String> _subjectCollections = ['subjects', 'Subjects'];
+  static const List<String> _mappingCollections = ['mappings', 'Mappings'];
+  static const List<String> _roomCollections = ['rooms', 'Rooms', 'Room'];
+  static const List<Map<String, String>> _configCandidates = [
+    {'collection': 'config', 'doc': 'timetable'},
+    {'collection': 'Config', 'doc': 'timetable'},
+    {'collection': 'timetable_config', 'doc': 'default'},
+  ];
+
+  Future<List<Map<String, dynamic>>> getAllPrograms() async {
+    try {
+      final docs = await _getDocsFromCandidates(_programCollections);
+      return docs
+          .map((doc) => {'id': doc.id, ...doc.data()})
+          .toList(growable: false);
+    } catch (e, st) {
+      dev.log('getAllPrograms failed', error: e, stackTrace: st);
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getSubjectsByProgram(
+    String programId,
+  ) async {
+    if (programId.isEmpty) {
+      return [];
+    }
+    try {
+      final docs = await _getDocsFromCandidates(_subjectCollections);
+      return docs
+          .where((doc) => (doc.data()['program_id'] ?? '') == programId)
+          .map((doc) => {'id': doc.id, ...doc.data()})
+          .toList(growable: false);
+    } catch (e, st) {
+      dev.log('getSubjectsByProgram failed', error: e, stackTrace: st);
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getMappings() async {
+    try {
+      final docs = await _getDocsFromCandidates(_mappingCollections);
+      return docs
+          .map((doc) => {'id': doc.id, ...doc.data()})
+          .toList(growable: false);
+    } catch (e, st) {
+      dev.log('getMappings failed', error: e, stackTrace: st);
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getRooms() async {
+    try {
+      final docs = await _getDocsFromCandidates(_roomCollections);
+      return docs
+          .map((doc) => {'id': doc.id, ...doc.data()})
+          .toList(growable: false);
+    } catch (e, st) {
+      dev.log('getRooms failed', error: e, stackTrace: st);
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> getConfig() async {
+    try {
+      for (final candidate in _configCandidates) {
+        final doc = await _db
+            .collection(candidate['collection']!)
+            .doc(candidate['doc']!)
+            .get();
+        if (doc.exists) {
+          final data = doc.data() ?? {};
+          return {
+            'working_days': (data['working_days'] as num?)?.toInt() ?? 5,
+            'periods': (data['periods'] as num?)?.toInt() ?? 6,
+            'duration_per_period':
+                (data['duration_per_period'] as num?)?.toInt() ?? 50,
+            'max_lectures_per_day':
+                (data['max_lectures_per_day'] as num?)?.toInt() ?? 4,
+          };
+        }
+      }
+    } catch (e, st) {
+      dev.log('getConfig failed', error: e, stackTrace: st);
+    }
+    return {
+      'working_days': 5,
+      'periods': 6,
+      'duration_per_period': 50,
+      'max_lectures_per_day': 4,
+    };
+  }
+
+  Future<Map<String, dynamic>> prepareTimetableData() async {
+    final timetableData = <String, dynamic>{};
+
+    try {
+      final programs = await getAllPrograms();
+      final mappings = await getMappings();
+      final rooms = await getRooms();
+      final config = await getConfig();
+      final mappingBySubject = _buildSubjectFacultyMap(mappings);
+
+      for (final program in programs) {
+        final programId = (program['id'] ?? '').toString();
+        if (programId.isEmpty) {
+          continue;
+        }
+
+        final subjects = await getSubjectsByProgram(programId);
+        if (subjects.isEmpty) {
+          dev.log(
+            'Warning: Program $programId has no subjects',
+            name: 'TimetableService',
+          );
+        }
+
+        final facultyMap = <String, String>{};
+        for (final subject in subjects) {
+          final subjectId = (subject['id'] ?? '').toString();
+          if (subjectId.isEmpty) {
+            continue;
+          }
+
+          final facultyId = mappingBySubject[subjectId];
+          if (facultyId == null || facultyId.isEmpty) {
+            dev.log(
+              'Warning: Subject $subjectId has no faculty mapping',
+              name: 'TimetableService',
+            );
+            continue;
+          }
+          facultyMap[subjectId] = facultyId;
+        }
+
+        timetableData[programId] = {
+          'subjects': subjects,
+          'facultyMap': facultyMap,
+        };
+      }
+
+      final prepared = {
+        'programs': timetableData,
+        'rooms': rooms,
+        'config': config,
+      };
+      _logPreparedData(prepared);
+      return prepared;
+    } catch (e, st) {
+      dev.log('prepareTimetableData failed', error: e, stackTrace: st);
+      return {
+        'programs': <String, dynamic>{},
+        'rooms': <Map<String, dynamic>>[],
+        'config': await getConfig(),
+      };
+    }
+  }
 
   Future<void> generateTimetable() async {
     final programs = await _fetchPrograms();
@@ -250,46 +410,91 @@ class TimetableService {
   }
 
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _fetchPrograms() {
-    return _db.collection('Programs').get().then((s) => s.docs);
+    return _getDocsFromCandidates(_programCollections);
   }
 
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _fetchSubjects() {
-    return _db.collection('Subjects').get().then((s) => s.docs);
+    return _getDocsFromCandidates(_subjectCollections);
   }
 
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _fetchMappings() {
-    return _db.collection('Mappings').get().then((s) => s.docs);
+    return _getDocsFromCandidates(_mappingCollections);
   }
 
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _fetchRooms() async {
-    for (final name in const ['Rooms', 'Room', 'rooms']) {
-      final snap = await _db.collection(name).get();
-      if (snap.docs.isNotEmpty) {
-        return snap.docs;
+    return _getDocsFromCandidates(_roomCollections);
+  }
+
+  Future<Map<String, int>> _fetchConfig() async {
+    final config = await getConfig();
+    return {
+      'working_days': (config['working_days'] as int?) ?? 5,
+      'periods': (config['periods'] as int?) ?? 6,
+    };
+  }
+
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _getDocsFromCandidates(
+    List<String> collections,
+  ) async {
+    for (final collection in collections) {
+      try {
+        final snap = await _db.collection(collection).get();
+        if (snap.docs.isNotEmpty) {
+          return snap.docs;
+        }
+      } catch (e, st) {
+        dev.log(
+          'Collection fetch failed: $collection',
+          error: e,
+          stackTrace: st,
+          name: 'TimetableService',
+        );
       }
     }
     return [];
   }
 
-  Future<Map<String, int>> _fetchConfig() async {
-    for (final candidate in const [
-      {'collection': 'config', 'doc': 'timetable'},
-      {'collection': 'Config', 'doc': 'timetable'},
-      {'collection': 'timetable_config', 'doc': 'default'},
-    ]) {
-      final doc = await _db
-          .collection(candidate['collection']!)
-          .doc(candidate['doc']!)
-          .get();
-      if (doc.exists) {
-        final data = doc.data() ?? {};
-        return {
-          'working_days': (data['working_days'] as num?)?.toInt() ?? 5,
-          'periods': (data['periods'] as num?)?.toInt() ?? 6,
-        };
+  Map<String, String> _buildSubjectFacultyMap(List<Map<String, dynamic>> mappings) {
+    final subjectFacultyMap = <String, String>{};
+    for (final mapping in mappings) {
+      final subjectId = (mapping['subject_id'] ?? '').toString();
+      final facultyId = (mapping['faculty_id'] ?? '').toString();
+      if (subjectId.isEmpty || facultyId.isEmpty) {
+        continue;
       }
+
+      if (subjectFacultyMap.containsKey(subjectId) &&
+          subjectFacultyMap[subjectId] != facultyId) {
+        dev.log(
+          'Warning: Multiple faculty mappings found for subject $subjectId. Using first mapping.',
+          name: 'TimetableService',
+        );
+        continue;
+      }
+      subjectFacultyMap[subjectId] = facultyId;
     }
-    return {'working_days': 5, 'periods': 6};
+    return subjectFacultyMap;
+  }
+
+  void _logPreparedData(Map<String, dynamic> preparedData) {
+    final programs = (preparedData['programs'] as Map<String, dynamic>? ?? {});
+    final rooms = (preparedData['rooms'] as List<dynamic>? ?? []);
+    final config = (preparedData['config'] as Map<String, dynamic>? ?? {});
+
+    dev.log('----- Timetable Data Prepared -----', name: 'TimetableService');
+    dev.log('Programs: ${programs.length}', name: 'TimetableService');
+    for (final entry in programs.entries) {
+      final data = entry.value as Map<String, dynamic>? ?? {};
+      final subjects = (data['subjects'] as List<dynamic>? ?? []);
+      final facultyMap = (data['facultyMap'] as Map<String, dynamic>? ?? {});
+      dev.log(
+        'Program ${entry.key} -> subjects: ${subjects.length}, mapped: ${facultyMap.length}',
+        name: 'TimetableService',
+      );
+    }
+    dev.log('Rooms: ${rooms.length}', name: 'TimetableService');
+    dev.log('Config: $config', name: 'TimetableService');
+    dev.log('----------------------------------', name: 'TimetableService');
   }
 
   Future<void> _saveTimetable(List<Map<String, dynamic>> rows) async {
