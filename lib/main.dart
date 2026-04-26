@@ -9,6 +9,7 @@ import 'package:timetable_scheduler/screens/admin/add_program_screen.dart';
 import 'package:timetable_scheduler/screens/admin/add_room_screen.dart';
 import 'package:timetable_scheduler/screens/admin/add_subject_screen.dart';
 import 'package:timetable_scheduler/screens/admin/dashboard_screen.dart';
+import 'package:timetable_scheduler/screens/admin/overview_screen.dart';
 import 'package:timetable_scheduler/screens/admin/timetable_config_screen.dart';
 import 'package:timetable_scheduler/screens/auth/login_screen.dart';
 import 'package:timetable_scheduler/screens/admin/add_mapping_screen.dart';
@@ -34,7 +35,8 @@ class MyApp extends StatelessWidget {
       routes: {
         AppRoutes.login: (context) => const LoginScreen(),
         AppRoutes.dashboard: (context) => const DashboardScreen(),
-        AppRoutes.timetableConfig: (context) => const TimetableConfigScreen(),
+        AppRoutes.overview: (context) => const OverviewScreen(),
+        AppRoutes.timetableConfig: (context) => const AddConfigsScreen(),
         AppRoutes.addDepartment: (context) => const AddDepartmentScreen(),
         AppRoutes.addProgram: (context) => const AddProgramScreen(),
         AppRoutes.addFaculty: (context) => const AddFacultyScreen(),

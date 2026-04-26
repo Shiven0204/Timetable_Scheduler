@@ -18,7 +18,7 @@ class DashboardScreen extends StatelessWidget {
             height: 48,
             child: ElevatedButton(
               onPressed: () {
-                Navigator.pushNamed(context, AppRoutes.timetableConfig);
+                Navigator.pushNamed(context, AppRoutes.overview);
               },
               child: const Text('My Timetable'),
             ),
