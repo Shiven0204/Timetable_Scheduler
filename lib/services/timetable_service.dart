@@ -81,8 +81,14 @@ class TimetableService {
         if (doc.exists) {
           final data = doc.data() ?? {};
           return {
-            'working_days': (data['working_days'] as num?)?.toInt() ?? 5,
-            'periods': (data['periods'] as num?)?.toInt() ?? 6,
+            'working_days_per_week':
+                (data['working_days_per_week'] as num?)?.toInt() ??
+                    (data['working_days'] as num?)?.toInt() ??
+                    5,
+            'periods_per_day':
+                (data['periods_per_day'] as num?)?.toInt() ??
+                    (data['periods'] as num?)?.toInt() ??
+                    6,
             'duration_per_period':
                 (data['duration_per_period'] as num?)?.toInt() ?? 50,
             'max_lectures_per_day':
@@ -94,11 +100,43 @@ class TimetableService {
       dev.log('getConfig failed', error: e, stackTrace: st);
     }
     return {
-      'working_days': 5,
-      'periods': 6,
+      'working_days_per_week': 5,
+      'periods_per_day': 6,
       'duration_per_period': 50,
       'max_lectures_per_day': 4,
     };
+  }
+
+  Future<Map<String, dynamic>> createEmptyTimetableGrid() async {
+    try {
+      final config = await getConfig();
+      final programs = await getAllPrograms();
+
+      final workingDays = (config['working_days_per_week'] as int?) ?? 5;
+      final periodsPerDay = (config['periods_per_day'] as int?) ?? 6;
+      final dayNames = _buildDayNames(workingDays);
+
+      final timetable = <String, dynamic>{};
+
+      for (final program in programs) {
+        final programId = (program['id'] ?? '').toString();
+        if (programId.isEmpty) {
+          continue;
+        }
+
+        final dayGrid = <String, List<dynamic>>{};
+        for (final day in dayNames) {
+          dayGrid[day] = List<dynamic>.filled(periodsPerDay, null);
+        }
+        timetable[programId] = dayGrid;
+      }
+
+      _logEmptyGrid(timetable, dayNames, periodsPerDay);
+      return timetable;
+    } catch (e, st) {
+      dev.log('createEmptyTimetableGrid failed', error: e, stackTrace: st);
+      return {};
+    }
   }
 
   Future<Map<String, dynamic>> prepareTimetableData() async {
@@ -428,9 +466,32 @@ class TimetableService {
   Future<Map<String, int>> _fetchConfig() async {
     final config = await getConfig();
     return {
-      'working_days': (config['working_days'] as int?) ?? 5,
-      'periods': (config['periods'] as int?) ?? 6,
+      'working_days': (config['working_days_per_week'] as int?) ?? 5,
+      'periods': (config['periods_per_day'] as int?) ?? 6,
     };
+  }
+
+  List<String> _buildDayNames(int workingDays) {
+    const baseDays = <String>[
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+    ];
+    if (workingDays <= 0) {
+      return baseDays;
+    }
+    if (workingDays <= baseDays.length) {
+      return baseDays.sublist(0, workingDays);
+    }
+
+    final extended = List<String>.from(baseDays);
+    const extraDays = ['Saturday', 'Sunday'];
+    for (var i = 0; i < workingDays - baseDays.length; i++) {
+      extended.add(extraDays[i % extraDays.length]);
+    }
+    return extended;
   }
 
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>> _getDocsFromCandidates(
@@ -495,6 +556,28 @@ class TimetableService {
     dev.log('Rooms: ${rooms.length}', name: 'TimetableService');
     dev.log('Config: $config', name: 'TimetableService');
     dev.log('----------------------------------', name: 'TimetableService');
+  }
+
+  void _logEmptyGrid(
+    Map<String, dynamic> timetable,
+    List<String> days,
+    int periodsPerDay,
+  ) {
+    dev.log('----- Empty Timetable Grid -----', name: 'TimetableService');
+    dev.log('Programs: ${timetable.length}', name: 'TimetableService');
+    dev.log('Days: ${days.join(', ')}', name: 'TimetableService');
+    dev.log('Periods per day: $periodsPerDay', name: 'TimetableService');
+
+    for (final entry in timetable.entries) {
+      final dayGrid = entry.value as Map<String, dynamic>? ?? {};
+      dev.log('Program ${entry.key}', name: 'TimetableService');
+      for (final day in days) {
+        final slots = (dayGrid[day] as List<dynamic>? ?? []);
+        dev.log('  $day -> ${slots.length} slots: $slots', name: 'TimetableService');
+      }
+    }
+
+    dev.log('-------------------------------', name: 'TimetableService');
   }
 
   Future<void> _saveTimetable(List<Map<String, dynamic>> rows) async {

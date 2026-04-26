@@ -18,6 +18,7 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen> {
 
   bool _saving = false;
   bool _preparing = false;
+  bool _creatingGrid = false;
 
   @override
   void dispose() {
@@ -99,6 +100,31 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen> {
     }
   }
 
+  Future<void> _createTimetableGrid() async {
+    setState(() {
+      _creatingGrid = true;
+    });
+
+    try {
+      await _timetableService.createEmptyTimetableGrid();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Grid Created')));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to create timetable grid')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _creatingGrid = false;
+        });
+      }
+    }
+  }
+
   InputDecoration _decoration(String label) {
     return InputDecoration(
       labelText: label,
@@ -166,6 +192,20 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Text('Prepare Data'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _creatingGrid ? null : _createTimetableGrid,
+                child: _creatingGrid
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Create Timetable Grid'),
               ),
             ),
           ],
