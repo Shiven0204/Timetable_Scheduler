@@ -19,6 +19,7 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen> {
   bool _saving = false;
   bool _preparing = false;
   bool _creatingGrid = false;
+  bool _schedulingLabs = false;
 
   @override
   void dispose() {
@@ -125,6 +126,31 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen> {
     }
   }
 
+  Future<void> _scheduleLabs() async {
+    setState(() {
+      _schedulingLabs = true;
+    });
+
+    try {
+      await _timetableService.scheduleLabsFromPreparedData();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Labs Scheduled')));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to schedule labs')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _schedulingLabs = false;
+        });
+      }
+    }
+  }
+
   InputDecoration _decoration(String label) {
     return InputDecoration(
       labelText: label,
@@ -206,6 +232,20 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Text('Create Timetable Grid'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _schedulingLabs ? null : _scheduleLabs,
+                child: _schedulingLabs
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Schedule Labs'),
               ),
             ),
           ],
