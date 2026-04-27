@@ -20,6 +20,7 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen> {
   bool _preparing = false;
   bool _creatingGrid = false;
   bool _schedulingLabs = false;
+  bool _generatingFull = false;
 
   @override
   void dispose() {
@@ -151,6 +152,31 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen> {
     }
   }
 
+  Future<void> _generateFullTimetable() async {
+    setState(() {
+      _generatingFull = true;
+    });
+
+    try {
+      await _timetableService.generateFullTimetableFromPreparedData();
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Timetable Generated')));
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Unable to generate full timetable')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _generatingFull = false;
+        });
+      }
+    }
+  }
+
   InputDecoration _decoration(String label) {
     return InputDecoration(
       labelText: label,
@@ -246,6 +272,20 @@ class _TimetableConfigScreenState extends State<TimetableConfigScreen> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Text('Schedule Labs'),
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _generatingFull ? null : _generateFullTimetable,
+                child: _generatingFull
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Generate Full Timetable'),
               ),
             ),
           ],

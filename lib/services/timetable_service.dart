@@ -211,6 +211,107 @@ class TimetableService {
     return scheduleLabs(emptyGrid, timetableData);
   }
 
+  Future<Map<String, dynamic>> scheduleTheorySubjects(
+    Map<String, dynamic> timetable,
+    Map<String, dynamic> timetableData,
+  ) async {
+    try {
+      final programsData =
+          (timetableData['programs'] as Map<String, dynamic>? ?? {});
+      final rooms = (timetableData['rooms'] as List<dynamic>? ?? [])
+          .whereType<Map<String, dynamic>>()
+          .toList(growable: false);
+      final classroomRooms =
+          rooms.where((room) => !_isLabRoom(room)).toList(growable: false);
+
+      if (classroomRooms.isEmpty) {
+        dev.log(
+          'No classroom rooms found. Theory scheduling skipped.',
+          name: 'TimetableService',
+        );
+        return timetable;
+      }
+
+      final facultySchedule = <String, Map<String, Set<int>>>{};
+      final roomSchedule = <String, Map<String, Set<int>>>{};
+      _buildOccupiedSchedulesFromTimetable(
+        timetable: timetable,
+        facultySchedule: facultySchedule,
+        roomSchedule: roomSchedule,
+      );
+
+      final assignmentStats = <String, Map<String, int>>{};
+
+      for (final programEntry in programsData.entries) {
+        final programId = programEntry.key;
+        final programInfo =
+            (programEntry.value as Map<String, dynamic>? ?? <String, dynamic>{});
+        final subjects = (programInfo['subjects'] as List<dynamic>? ?? [])
+            .whereType<Map<String, dynamic>>()
+            .toList(growable: false);
+        final facultyMap =
+            (programInfo['facultyMap'] as Map<String, dynamic>? ?? {})
+                .map((key, value) => MapEntry(key, value.toString()));
+        final programGrid =
+            (timetable[programId] as Map<String, dynamic>? ?? <String, dynamic>{});
+        if (programGrid.isEmpty) {
+          continue;
+        }
+
+        final theorySubjects = subjects
+            .where((subject) => subject['is_lab'] != true)
+            .toList(growable: false);
+
+        for (final subject in theorySubjects) {
+          final subjectId = (subject['id'] ?? '').toString();
+          final facultyId = (facultyMap[subjectId] ?? '').toString();
+          final lecturesTarget = (subject['credits'] as num?)?.toInt() ?? 0;
+
+          if (subjectId.isEmpty || facultyId.isEmpty || lecturesTarget <= 0) {
+            continue;
+          }
+
+          var lecturesNeeded = lecturesTarget;
+          while (lecturesNeeded > 0) {
+            final assigned = _tryPlaceOneTheoryLecture(
+              programGrid: programGrid,
+              subjectId: subjectId,
+              facultyId: facultyId,
+              classroomRooms: classroomRooms,
+              facultySchedule: facultySchedule,
+              roomSchedule: roomSchedule,
+            );
+
+            if (!assigned) {
+              dev.log(
+                'Could not place all theory lectures for subject $subjectId in program $programId. Remaining: $lecturesNeeded',
+                name: 'TimetableService',
+              );
+              break;
+            }
+            lecturesNeeded--;
+          }
+
+          assignmentStats.putIfAbsent(programId, () => <String, int>{});
+          assignmentStats[programId]![subjectId] = lecturesTarget - lecturesNeeded;
+        }
+      }
+
+      _logTheorySchedulePreview(timetable, assignmentStats);
+      return timetable;
+    } catch (e, st) {
+      dev.log('scheduleTheorySubjects failed', error: e, stackTrace: st);
+      return timetable;
+    }
+  }
+
+  Future<Map<String, dynamic>> generateFullTimetableFromPreparedData() async {
+    final timetableData = await prepareTimetableData();
+    final emptyGrid = await createEmptyTimetableGrid();
+    final withLabs = await scheduleLabs(emptyGrid, timetableData);
+    return scheduleTheorySubjects(withLabs, timetableData);
+  }
+
   Future<Map<String, dynamic>> prepareTimetableData() async {
     final timetableData = <String, dynamic>{};
 
@@ -774,6 +875,140 @@ class TimetableService {
     }
 
     dev.log('-------------------------------', name: 'TimetableService');
+  }
+
+  void _buildOccupiedSchedulesFromTimetable({
+    required Map<String, dynamic> timetable,
+    required Map<String, Map<String, Set<int>>> facultySchedule,
+    required Map<String, Map<String, Set<int>>> roomSchedule,
+  }) {
+    for (final programEntry in timetable.entries) {
+      final dayGrid =
+          (programEntry.value as Map<String, dynamic>? ?? <String, dynamic>{});
+      for (final dayEntry in dayGrid.entries) {
+        final day = dayEntry.key;
+        final slots = (dayEntry.value as List<dynamic>? ?? []);
+        for (var period = 0; period < slots.length; period++) {
+          final slot = slots[period];
+          if (slot is! Map<String, dynamic>) {
+            continue;
+          }
+          final facultyId = (slot['faculty_id'] ?? '').toString();
+          final roomId = (slot['room_id'] ?? '').toString();
+          if (facultyId.isNotEmpty) {
+            _markStringSchedule(facultySchedule, facultyId, day, period);
+          }
+          if (roomId.isNotEmpty) {
+            _markStringSchedule(roomSchedule, roomId, day, period);
+          }
+        }
+      }
+    }
+  }
+
+  bool _tryPlaceOneTheoryLecture({
+    required Map<String, dynamic> programGrid,
+    required String subjectId,
+    required String facultyId,
+    required List<Map<String, dynamic>> classroomRooms,
+    required Map<String, Map<String, Set<int>>> facultySchedule,
+    required Map<String, Map<String, Set<int>>> roomSchedule,
+  }) {
+    for (final dayEntry in programGrid.entries) {
+      final day = dayEntry.key;
+      final slots = (dayEntry.value as List<dynamic>? ?? []);
+
+      if (_subjectAlreadyPlacedInDay(slots, subjectId)) {
+        continue;
+      }
+
+      for (var period = 0; period < slots.length; period++) {
+        if (slots[period] != null) {
+          continue;
+        }
+        if (_isConflict(facultySchedule, facultyId, day, period)) {
+          continue;
+        }
+
+        final roomId = _findAvailableClassroom(
+          day: day,
+          period: period,
+          classroomRooms: classroomRooms,
+          roomSchedule: roomSchedule,
+        );
+        if (roomId == null) {
+          continue;
+        }
+
+        slots[period] = {
+          'subject_id': subjectId,
+          'faculty_id': facultyId,
+          'room_id': roomId,
+          'type': 'theory',
+        };
+        _markStringSchedule(facultySchedule, facultyId, day, period);
+        _markStringSchedule(roomSchedule, roomId, day, period);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool _subjectAlreadyPlacedInDay(List<dynamic> slots, String subjectId) {
+    for (final slot in slots) {
+      if (slot is Map<String, dynamic> && slot['subject_id'] == subjectId) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  String? _findAvailableClassroom({
+    required String day,
+    required int period,
+    required List<Map<String, dynamic>> classroomRooms,
+    required Map<String, Map<String, Set<int>>> roomSchedule,
+  }) {
+    for (final room in classroomRooms) {
+      final roomId = (room['id'] ?? '').toString();
+      if (roomId.isEmpty) {
+        continue;
+      }
+      if (!_isConflict(roomSchedule, roomId, day, period)) {
+        return roomId;
+      }
+    }
+    return null;
+  }
+
+  void _logTheorySchedulePreview(
+    Map<String, dynamic> timetable,
+    Map<String, Map<String, int>> assignmentStats,
+  ) {
+    if (timetable.isEmpty) {
+      dev.log(
+        'Theory scheduling preview: timetable is empty',
+        name: 'TimetableService',
+      );
+      return;
+    }
+
+    final firstProgram = timetable.entries.first;
+    final programId = firstProgram.key;
+    final programGrid =
+        (firstProgram.value as Map<String, dynamic>? ?? <String, dynamic>{});
+
+    dev.log('----- Theory Scheduling Preview -----', name: 'TimetableService');
+    dev.log('Program: $programId', name: 'TimetableService');
+    for (final dayEntry in programGrid.entries) {
+      final day = dayEntry.key;
+      final slots = (dayEntry.value as List<dynamic>? ?? []);
+      dev.log('$day -> $slots', name: 'TimetableService');
+    }
+
+    final stats = assignmentStats[programId] ?? {};
+    dev.log('Assigned lectures by subject: $stats', name: 'TimetableService');
+    dev.log('-----------------------------------', name: 'TimetableService');
   }
 
   Future<void> _saveTimetable(List<Map<String, dynamic>> rows) async {

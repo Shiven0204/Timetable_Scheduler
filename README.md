@@ -16,6 +16,9 @@ A Flutter app for admin-driven timetable setup and generation (Firebase integrat
 - Add Mapping (subject -> faculty -> program)
 - Timetable data preparation layer (`prepareTimetableData()`)
 - Empty timetable grid creation (`createEmptyTimetableGrid()`)
+- Lab-only scheduling (`scheduleLabs()`)
+- Theory scheduling into remaining empty slots (`scheduleTheorySubjects()`)
+- Full pipeline trigger (`generateFullTimetableFromPreparedData()`)
 
 ## Navigation Flow
 
@@ -30,6 +33,8 @@ Timetable Settings
   -> Save Configuration
   -> Prepare Data
   -> Create Timetable Grid
+  -> Schedule Labs
+  -> Generate Full Timetable
 ```
 
 ## Main Routes
@@ -56,6 +61,9 @@ Timetable Settings
 - `getConfig()`
 - `prepareTimetableData()`
 - `createEmptyTimetableGrid()`
+- `scheduleLabs(timetable, timetableData)`
+- `scheduleTheorySubjects(timetable, timetableData)`
+- `generateFullTimetableFromPreparedData()`
 
 Grid creation uses config values:
 
@@ -63,6 +71,14 @@ Grid creation uses config values:
 - `periods_per_day` (fallback supported)
 
 Each program receives a day-period matrix initialized with `null` slots.
+
+Current scheduling rules:
+
+- Labs: 2 consecutive slots, once per week
+- Theory: fills only empty slots
+- Theory daily limit: same subject max 1 slot/day
+- Faculty and room conflict checks applied
+- Lab slots are not overwritten by theory
 
 ## Project Structure
 
