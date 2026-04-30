@@ -13,6 +13,7 @@ import 'package:timetable_scheduler/screens/admin/overview_screen.dart';
 import 'package:timetable_scheduler/screens/admin/timetable_config_screen.dart';
 import 'package:timetable_scheduler/screens/auth/login_screen.dart';
 import 'package:timetable_scheduler/screens/admin/add_mapping_screen.dart';
+import 'package:timetable_scheduler/screens/faculty/faculty_schedule_screen.dart';
 import 'package:timetable_scheduler/screens/student/view_timetable_screen.dart';
 
 void main() async {
@@ -45,6 +46,7 @@ class MyApp extends StatelessWidget {
         AppRoutes.addRoom: (context) => const AddRoomScreen(),
         AppRoutes.addMapping: (context) => const AddMappingScreen(),
         AppRoutes.viewTimetable: (context) => const ViewTimetableScreen(),
+        AppRoutes.facultySchedule: (context) => const FacultyScheduleScreen(),
       },
     );
   }
