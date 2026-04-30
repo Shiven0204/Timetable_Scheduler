@@ -124,6 +124,16 @@ class _OverviewScreenState extends State<OverviewScreen> {
               SizedBox(
                 height: 48,
                 child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, AppRoutes.viewTimetable);
+                  },
+                  child: const Text('View Timetable'),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 48,
+                child: ElevatedButton(
                   onPressed: _isGenerating ? null : _generateTimetable,
                   child: _isGenerating
                       ? const SizedBox(
