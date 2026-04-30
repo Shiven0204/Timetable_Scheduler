@@ -11,4 +11,6 @@ class AppRoutes {
   static const addMapping = '/add-mapping';
   static const viewTimetable = '/view-timetable';
   static const facultySchedule = '/faculty-schedule';
+  static const instituteData = '/institute-data';
+  static const lectureConfiguration = '/lecture-configuration';
 }

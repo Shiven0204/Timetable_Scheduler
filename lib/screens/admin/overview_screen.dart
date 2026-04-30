@@ -55,9 +55,9 @@ class _OverviewScreenState extends State<OverviewScreen> {
                 height: 48,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.pushNamed(context, AppRoutes.addDepartment);
+                    Navigator.pushNamed(context, AppRoutes.instituteData);
                   },
-                  child: const Text('Department'),
+                  child: const Text('Data Input'),
                 ),
               ),
               const SizedBox(height: 16),
@@ -65,59 +65,12 @@ class _OverviewScreenState extends State<OverviewScreen> {
                 height: 48,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.pushNamed(context, AppRoutes.addProgram);
+                    Navigator.pushNamed(
+                      context,
+                      AppRoutes.lectureConfiguration,
+                    );
                   },
-                  child: const Text('Program'),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, AppRoutes.addFaculty);
-                  },
-                  child: const Text('Faculty'),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, AppRoutes.addSubject);
-                  },
-                  child: const Text('Subject'),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, AppRoutes.addRoom);
-                  },
-                  child: const Text('Room'),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, AppRoutes.addMapping);
-                  },
-                  child: const Text('Mapping'),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, AppRoutes.timetableConfig);
-                  },
-                  child: const Text('Timetable Settings'),
+                  child: const Text('Lecture Configuration'),
                 ),
               ),
               const SizedBox(height: 16),

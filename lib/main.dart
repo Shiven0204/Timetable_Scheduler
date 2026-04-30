@@ -9,6 +9,8 @@ import 'package:timetable_scheduler/screens/admin/add_program_screen.dart';
 import 'package:timetable_scheduler/screens/admin/add_room_screen.dart';
 import 'package:timetable_scheduler/screens/admin/add_subject_screen.dart';
 import 'package:timetable_scheduler/screens/admin/dashboard_screen.dart';
+import 'package:timetable_scheduler/screens/admin/institute_data_screen.dart';
+import 'package:timetable_scheduler/screens/admin/lecture_configuration_screen.dart';
 import 'package:timetable_scheduler/screens/admin/overview_screen.dart';
 import 'package:timetable_scheduler/screens/admin/timetable_config_screen.dart';
 import 'package:timetable_scheduler/screens/auth/login_screen.dart';
@@ -47,6 +49,9 @@ class MyApp extends StatelessWidget {
         AppRoutes.addMapping: (context) => const AddMappingScreen(),
         AppRoutes.viewTimetable: (context) => const ViewTimetableScreen(),
         AppRoutes.facultySchedule: (context) => const FacultyScheduleScreen(),
+        AppRoutes.instituteData: (context) => const InstituteDataScreen(),
+        AppRoutes.lectureConfiguration: (context) =>
+            const LectureConfigurationScreen(),
       },
     );
   }
