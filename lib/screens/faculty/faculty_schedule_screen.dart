@@ -325,34 +325,48 @@ class _FacultyScheduleScreenState extends State<FacultyScheduleScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            DropdownButtonFormField<String>(
-              initialValue: _selectedFacultyId,
-              decoration: const InputDecoration(
-                labelText: 'Select Faculty',
-                border: OutlineInputBorder(),
-              ),
-              items: _faculties
-                  .map(
-                    (faculty) => DropdownMenuItem<String>(
-                      value: faculty['id'] as String,
-                      child: Text(
-                        (faculty['faculty_name'] ?? faculty['id']).toString(),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  )
-                  .toList(),
-              onChanged: _loadingFaculties
-                  ? null
-                  : (value) async {
-                      if (value == null) return;
-                      setState(() {
-                        _selectedFacultyId = value;
-                      });
-                      await getTimetableByFaculty(value);
-                    },
+            const Text(
+              'Weekly Faculty Schedule',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 16),
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: DropdownButtonFormField<String>(
+                  initialValue: _selectedFacultyId,
+                  decoration: const InputDecoration(
+                    labelText: 'Select Faculty',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _faculties
+                      .map(
+                        (faculty) => DropdownMenuItem<String>(
+                          value: faculty['id'] as String,
+                          child: Text(
+                            (faculty['faculty_name'] ?? faculty['id']).toString(),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: _loadingFaculties
+                      ? null
+                      : (value) async {
+                          if (value == null) return;
+                          setState(() {
+                            _selectedFacultyId = value;
+                          });
+                          await getTimetableByFaculty(value);
+                        },
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             if (_loadingFaculties || _loadingSchedule)
               const Expanded(
                 child: Center(child: CircularProgressIndicator()),
@@ -371,8 +385,17 @@ class _FacultyScheduleScreenState extends State<FacultyScheduleScreen> {
               )
             else
               Expanded(
-                child: SingleChildScrollView(
-                  child: _buildTable(),
+                child: Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: SingleChildScrollView(
+                      child: _buildTable(),
+                    ),
+                  ),
                 ),
               ),
           ],

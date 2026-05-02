@@ -107,69 +107,84 @@ class _AddSubjectScreenState extends State<AddSubjectScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-
-            TextField(
-              controller: _subjectNameController,
-              decoration: _decoration('Subject Name'),
+        child: Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-
-            TextField(
-              controller: _creditsController,
-              keyboardType: TextInputType.number,
-              decoration: _decoration('Credits'),
-            ),
-            const SizedBox(height: 8),
-
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('Is Lab'),
-              value: _isLab,
-              onChanged: (value) {
-                setState(() {
-                  _isLab = value;
-                });
-              },
-            ),
-            const SizedBox(height: 8),
-
-            InputDecorator(
-              decoration: _decoration('Program'),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  isExpanded: true,
-                  value: _selectedProgramId,
-                  hint: const Text('Select program'),
-                  items: _programs.map<DropdownMenuItem<String>>((p) {
-                    return DropdownMenuItem<String>(
-                      value: p['id'],
-                      child: Text(
-                        "${p['program_name']} - ${p['branch_name']}"
-                      ),
-                    );
-                  }).toList(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Subject Details',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _subjectNameController,
+                  decoration: _decoration('Subject Name'),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _creditsController,
+                  keyboardType: TextInputType.number,
+                  decoration: _decoration('Credits'),
+                ),
+                const SizedBox(height: 8),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Is Lab'),
+                  value: _isLab,
                   onChanged: (value) {
                     setState(() {
-                      _selectedProgramId = value;
+                      _isLab = value;
                     });
                   },
                 ),
-              ),
+                const SizedBox(height: 8),
+                InputDecorator(
+                  decoration: _decoration('Program'),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: _selectedProgramId,
+                      hint: const Text('Select program'),
+                      items: _programs.map<DropdownMenuItem<String>>((p) {
+                        return DropdownMenuItem<String>(
+                          value: p['id'],
+                          child: Text("${p['program_name']} - ${p['branch_name']}"),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedProgramId = value;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _onSave,
+                    child: const Text('Save'),
+                  ),
+                ),
+              ],
             ),
-
-            const SizedBox(height: 24),
-
-            SizedBox(
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _onSave,
-                child: const Text('Save'),
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );

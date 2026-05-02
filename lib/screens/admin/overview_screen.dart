@@ -40,74 +40,131 @@ class _OverviewScreenState extends State<OverviewScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Overview'),
       ),
-      body: Center(
+      body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, AppRoutes.instituteData);
-                  },
-                  child: const Text('Data Input'),
+              Text(
+                'Manage Timetable System',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: primaryColor,
                 ),
               ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushNamed(
-                      context,
-                      AppRoutes.lectureConfiguration,
-                    );
-                  },
-                  child: const Text('Lecture Configuration'),
-                ),
+              const SizedBox(height: 20),
+              _buildNavCard(
+                title: 'Data Input',
+                icon: Icons.storage,
+                color: primaryColor,
+                onTap: () {
+                  Navigator.pushNamed(context, AppRoutes.instituteData);
+                },
               ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, AppRoutes.viewTimetable);
-                  },
-                  child: const Text('View Timetable'),
-                ),
+              const SizedBox(height: 14),
+              _buildNavCard(
+                title: 'Lecture Configuration',
+                icon: Icons.settings,
+                color: primaryColor,
+                onTap: () {
+                  Navigator.pushNamed(context, AppRoutes.lectureConfiguration);
+                },
               ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, AppRoutes.facultySchedule);
-                  },
-                  child: const Text('Faculty Schedule'),
-                ),
+              const SizedBox(height: 14),
+              _buildNavCard(
+                title: 'View Timetable',
+                icon: Icons.table_chart,
+                color: primaryColor,
+                onTap: () {
+                  Navigator.pushNamed(context, AppRoutes.viewTimetable);
+                },
               ),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 48,
-                child: ElevatedButton(
-                  onPressed: _isGenerating ? null : _generateTimetable,
-                  child: _isGenerating
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Generate Timetable'),
-                ),
+              const SizedBox(height: 14),
+              _buildNavCard(
+                title: 'Faculty Schedule',
+                icon: Icons.person,
+                color: primaryColor,
+                onTap: () {
+                  Navigator.pushNamed(context, AppRoutes.facultySchedule);
+                },
+              ),
+              const SizedBox(height: 14),
+              _buildNavCard(
+                title: 'Generate Timetable',
+                icon: Icons.auto_fix_high,
+                color: primaryColor,
+                onTap: _isGenerating ? null : _generateTimetable,
+                trailing: _isGenerating
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : null,
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavCard({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required VoidCallback? onTap,
+    Widget? trailing,
+  }) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Ink(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+            child: Row(
+              children: [
+                Icon(icon, color: color),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    title,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                ),
+                trailing ?? Icon(Icons.chevron_right, color: color),
+              ],
+            ),
           ),
         ),
       ),

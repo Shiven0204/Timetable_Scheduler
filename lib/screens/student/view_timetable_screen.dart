@@ -332,34 +332,48 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            DropdownButtonFormField<String>(
-              initialValue: _selectedProgramId,
-              decoration: const InputDecoration(
-                labelText: 'Select Program',
-                border: OutlineInputBorder(),
-              ),
-              items: _programs
-                  .map(
-                    (program) => DropdownMenuItem<String>(
-                      value: program['id'] as String,
-                      child: Text(
-                        (program['program_name'] ?? program['id']).toString(),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                  )
-                  .toList(),
-              onChanged: _loadingPrograms
-                  ? null
-                  : (value) async {
-                      if (value == null) return;
-                      setState(() {
-                        _selectedProgramId = value;
-                      });
-                      await getTimetableByProgram(value);
-                    },
+            const Text(
+              'Weekly Student Timetable',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 16),
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: DropdownButtonFormField<String>(
+                  initialValue: _selectedProgramId,
+                  decoration: const InputDecoration(
+                    labelText: 'Select Program',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: _programs
+                      .map(
+                        (program) => DropdownMenuItem<String>(
+                          value: program['id'] as String,
+                          child: Text(
+                            (program['program_name'] ?? program['id']).toString(),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: _loadingPrograms
+                      ? null
+                      : (value) async {
+                          if (value == null) return;
+                          setState(() {
+                            _selectedProgramId = value;
+                          });
+                          await getTimetableByProgram(value);
+                        },
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
             if (_loadingPrograms || _loadingTimetable)
               const Expanded(
                 child: Center(child: CircularProgressIndicator()),
@@ -378,8 +392,17 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
               )
             else
               Expanded(
-                child: SingleChildScrollView(
-                  child: _buildTable(),
+                child: Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: SingleChildScrollView(
+                      child: _buildTable(),
+                    ),
+                  ),
                 ),
               ),
           ],

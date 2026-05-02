@@ -144,62 +144,75 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Add Mapping')),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-
-            _buildDropdown(
-              label: 'Faculty',
-              value: _selectedFacultyId,
-              items: _faculties,
-              displayKey: 'name',
-              onChanged: (val) => setState(() => _selectedFacultyId = val),
-            ),
-
-            const SizedBox(height: 16),
-
-            _buildDropdown(
-              label: 'Subject',
-              value: _selectedSubjectId,
-              items: _subjects,
-              displayKey: 'name',
-              onChanged: (val) => setState(() => _selectedSubjectId = val),
-            ),
-
-            const SizedBox(height: 16),
-
-            InputDecorator(
-              decoration: _decoration('Program'),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  isExpanded: true,
-                  value: _selectedProgramId,
-                  hint: const Text('Select program'),
-                  items: _programs.map<DropdownMenuItem<String>>((p) {
-                    return DropdownMenuItem<String>(
-                      value: p['id'],
-                      child: Text(
-                          "${p['program_name']} - ${p['branch_name']}"
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (val) =>
-                      setState(() => _selectedProgramId = val),
+        child: Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
-              ),
+              ],
             ),
-
-            const SizedBox(height: 24),
-
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _onSave,
-                child: const Text('Save Mapping'),
-              ),
+            child: Column(
+              children: [
+                const Text(
+                  'Mapping Details',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 16),
+                _buildDropdown(
+                  label: 'Faculty',
+                  value: _selectedFacultyId,
+                  items: _faculties,
+                  displayKey: 'name',
+                  onChanged: (val) => setState(() => _selectedFacultyId = val),
+                ),
+                const SizedBox(height: 16),
+                _buildDropdown(
+                  label: 'Subject',
+                  value: _selectedSubjectId,
+                  items: _subjects,
+                  displayKey: 'name',
+                  onChanged: (val) => setState(() => _selectedSubjectId = val),
+                ),
+                const SizedBox(height: 16),
+                InputDecorator(
+                  decoration: _decoration('Program'),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: _selectedProgramId,
+                      hint: const Text('Select program'),
+                      items: _programs.map<DropdownMenuItem<String>>((p) {
+                        return DropdownMenuItem<String>(
+                          value: p['id'],
+                          child: Text("${p['program_name']} - ${p['branch_name']}"),
+                        );
+                      }).toList(),
+                      onChanged: (val) => setState(() => _selectedProgramId = val),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _onSave,
+                    child: const Text('Save Mapping'),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

@@ -93,63 +93,81 @@ class _AddProgramScreenState extends State<AddProgramScreen> {
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-
-            TextField(
-              controller: _programNameController,
-              decoration: const InputDecoration(
-                labelText: 'Program Name (include year)',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            TextField(
-              controller: _branchController,
-              decoration: const InputDecoration(
-                labelText: 'Branch',
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            InputDecorator(
-              decoration: const InputDecoration(
-                labelText: 'Department',
-                border: OutlineInputBorder(),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  isExpanded: true,
-                  value: _selectedDepartmentId,
-                  hint: const Text('Select department'),
-                  items: _departments.map<DropdownMenuItem<String>>((d) {
-                    return DropdownMenuItem<String>(
-                      value: d['id'],
-                      child: Text(d['name']),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedDepartmentId = value;
-                    });
-                  },
+        child: Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
-              ),
+              ],
             ),
-
-            const SizedBox(height: 24),
-
-            SizedBox(
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _onSave,
-                child: const Text('Save'),
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Program Details',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _programNameController,
+                  decoration: const InputDecoration(
+                    labelText: 'Program Name (include year)',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _branchController,
+                  decoration: const InputDecoration(
+                    labelText: 'Branch',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                InputDecorator(
+                  decoration: const InputDecoration(
+                    labelText: 'Department',
+                    border: OutlineInputBorder(),
+                  ),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: _selectedDepartmentId,
+                      hint: const Text('Select department'),
+                      items: _departments.map<DropdownMenuItem<String>>((d) {
+                        return DropdownMenuItem<String>(
+                          value: d['id'],
+                          child: Text(d['name']),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedDepartmentId = value;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _onSave,
+                    child: const Text('Save'),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );

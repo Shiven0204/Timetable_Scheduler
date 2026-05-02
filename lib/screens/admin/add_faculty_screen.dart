@@ -112,67 +112,84 @@ class _AddFacultyScreenState extends State<AddFacultyScreen> {
       appBar: AppBar(title: const Text('Add Faculty')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            TextField(
-              controller: _nameController,
-              decoration: _decoration('Faculty Name'),
-            ),
-            const SizedBox(height: 16),
-
-            TextField(
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              decoration: _decoration('Email'),
-            ),
-            const SizedBox(height: 16),
-
-            TextField(
-              controller: _expertiseController,
-              decoration: _decoration('Expertise (comma separated)'),
-            ),
-            const SizedBox(height: 16),
-
-            TextField(
-              controller: _maxLecturesController,
-              keyboardType: TextInputType.number,
-              decoration: _decoration('Max Lectures Per Day'),
-            ),
-            const SizedBox(height: 16),
-
-            InputDecorator(
-              decoration: _decoration('Department'),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  isExpanded: true,
-                  value: _selectedDepartmentId,
-                  hint: const Text('Select department'),
-                  items: _departments.map<DropdownMenuItem<String>>((d) {
-                    return DropdownMenuItem<String>(
-                      value: d['id'],
-                      child: Text(d['name']),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedDepartmentId = value;
-                    });
-                  },
+        child: Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
                 ),
-              ),
+              ],
             ),
-
-            const SizedBox(height: 24),
-
-            SizedBox(
-              height: 48,
-              child: ElevatedButton(
-                onPressed: _onSave,
-                child: const Text('Save'),
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Faculty Details',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _nameController,
+                  decoration: _decoration('Faculty Name'),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: _decoration('Email'),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _expertiseController,
+                  decoration: _decoration('Expertise (comma separated)'),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _maxLecturesController,
+                  keyboardType: TextInputType.number,
+                  decoration: _decoration('Max Lectures Per Day'),
+                ),
+                const SizedBox(height: 16),
+                InputDecorator(
+                  decoration: _decoration('Department'),
+                  child: DropdownButtonHideUnderline(
+                    child: DropdownButton<String>(
+                      isExpanded: true,
+                      value: _selectedDepartmentId,
+                      hint: const Text('Select department'),
+                      items: _departments.map<DropdownMenuItem<String>>((d) {
+                        return DropdownMenuItem<String>(
+                          value: d['id'],
+                          child: Text(d['name']),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedDepartmentId = value;
+                        });
+                      },
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _onSave,
+                    child: const Text('Save'),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
