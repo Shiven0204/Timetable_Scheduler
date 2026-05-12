@@ -16,7 +16,7 @@ class DatabaseService {
         'created_at': FieldValue.serverTimestamp(),
       });
 
-      print("✅ Department saved successfully");
+      print(" Department saved successfully");
     } catch (e) {
       print("❌ Error saving department: $e");
       rethrow;
@@ -26,30 +26,30 @@ class DatabaseService {
   // Program Collection Reference
 
   Future<void> saveProgram({
-  required String programName,
-  required String branchName,
-  required String departmentId,
-}) async {
-  try {
-    if (programName.isEmpty ||
-        branchName.isEmpty ||
-        departmentId.isEmpty) {
-      throw Exception("Fields cannot be empty");
+    required String programName,
+    required String branchName,
+    required String departmentId,
+  }) async {
+    try {
+      if (programName.isEmpty ||
+          branchName.isEmpty ||
+          departmentId.isEmpty) {
+        throw Exception("Fields cannot be empty");
+      }
+      await _db.collection('Programs').add({
+        'program_name': programName,
+        'branch_name': branchName,
+        'department_id': departmentId,
+        'created_at': FieldValue.serverTimestamp(),
+      });
+
+
+      print(" Program saved successfully");
+    } catch (e) {
+      print("❌ Error saving program: $e");
+      rethrow;
     }
-    await _db.collection('Programs').add({
-      'program_name': programName,
-      'branch_name': branchName,
-      'department_id': departmentId,
-      'created_at': FieldValue.serverTimestamp(),
-    });
-
-
-    print("✅ Program saved successfully");
-  } catch (e) {
-    print("❌ Error saving program: $e");
-    rethrow;
   }
-}
 
   // Faculty Collection Reference
 
@@ -102,7 +102,7 @@ class DatabaseService {
         'created_at': FieldValue.serverTimestamp(),
       });
 
-      print("✅ Subject saved successfully");
+      print(" Subject saved successfully");
     } catch (e) {
       print("❌ Error saving subject: $e");
       rethrow;
@@ -112,23 +112,49 @@ class DatabaseService {
   //Mapping Collection Reference
 
   Future<void> saveMapping({
-  required String facultyId,
-  required String subjectId,
-  required String programId,
-}) async {
-  try {
-    await _db.collection('Mappings').add({
-      'faculty_id': facultyId,
-      'subject_id': subjectId,
-      'program_id': programId,
-      'created_at': FieldValue.serverTimestamp(),
-    });
+    required String facultyId,
+    required String subjectId,
+    required String programId,
+  }) async {
+    try {
+      await _db.collection('Mappings').add({
+        'faculty_id': facultyId,
+        'subject_id': subjectId,
+        'program_id': programId,
+        'created_at': FieldValue.serverTimestamp(),
+      });
 
-    print("✅ Mapping saved");
+      print(" Mapping saved");
 
-  } catch (e) {
-    print("❌ Error saving mapping: $e");
-    rethrow;
+    } catch (e) {
+      print(" Error saving mapping: $e");
+      rethrow;
+    }
   }
-}
+
+// Room Collection Reference
+  Future<void> saveRoom({
+    required String roomName,
+    required String roomType,
+    required int capacity,
+  }) async {
+    try {
+      if (roomName.isEmpty || roomType.isEmpty) {
+        throw Exception("Fields cannot be empty");
+      }
+
+      await _db.collection('Rooms').add({
+        'room_name': roomName,
+        'room_type': roomType,
+        'capacity': capacity,
+        'created_at': FieldValue.serverTimestamp(),
+      });
+
+      print("Room saved successfully");
+
+    } catch (e) {
+      print("Error saving room: $e");
+      rethrow;
+    }
+  }
 }
