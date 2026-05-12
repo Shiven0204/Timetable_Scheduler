@@ -12,7 +12,8 @@ Administrators configure the institute, map each subject to a faculty member and
 
 ## 2. Features
 
-- Firebase Authentication and Firestore
+- **Firebase Authentication** (email / password): sign-in validation, loading state, mapped error messages; **session persistence** via `authStateChanges()`; **sign out** from the dashboard app bar
+- **Firestore** for institute data and generated timetables
 - Admin dashboard (quick actions: My Timetables, Calendar)
 - Overview hub: data setup, lecture configuration, generate timetable, navigation to views
 - CRUD-style flows: departments, programs, faculty, subjects, rooms, **mappings (theory room + optional lab room)**
@@ -28,29 +29,43 @@ Administrators configure the institute, map each subject to a faculty member and
 | Layer | Responsibility |
 |--------|----------------|
 | **Screens** | Material UI, forms, navigation (`lib/screens/`) |
-| **Routes** | Named routes in `lib/routes/app_routes.dart`, registered in `main.dart` |
+| **Auth** | `AuthGate` (`lib/widgets/auth_gate.dart`) — root listens to `FirebaseAuth.instance.authStateChanges()`; signed-in users see `DashboardScreen`, others see `LoginScreen` |
+| **Routes** | Named routes in `lib/routes/app_routes.dart`, registered in `main.dart` (app `home` is `AuthGate`, not `/login`) |
 | **Services** | `DatabaseService` (writes), `TimetableService` (read config, prepare data, schedule, save), `TimetableNameResolver` / helpers for UI |
-| **Widgets** | Reusable timetable table (`lib/widgets/timetable_grid.dart`) |
-| **Firebase** | `firebase_options.dart`, Firestore collections listed below |
+| **Utils** | `RoomTypeUtils` (`lib/utils/room_type_utils.dart`), `messageForFirebaseAuth` (`lib/utils/auth_error_messages.dart`) |
+| **Widgets** | `TimetableGrid`, `AuthGate`, shared layout pieces (`lib/widgets/`) |
+| **Firebase** | `firebase_options.dart`, **Authentication** (email/password), Firestore collections listed below |
 
 ---
 
 ## 4. Tech stack
 
 - **Flutter** (Material 3–friendly UI)
-- **Firebase Core + Cloud Firestore**
+- **Firebase Core + Cloud Firestore + Firebase Auth**
 - **Dart** analyzer–clean codebase target for touched modules
 
 ---
 
-## 5. Firebase collections (typical)
+## 5. Authentication
+
+- **Sign-in**: `LoginScreen` uses `FirebaseAuth.instance.signInWithEmailAndPassword` after validating non-empty fields and email shape. Errors (e.g. `wrong-password`, `user-not-found`, `invalid-email`, `network-request-failed`) are surfaced via snackbars using **`lib/utils/auth_error_messages.dart`**.
+- **Session**: `AuthGate` combines `authStateChanges()` with **`FirebaseAuth.instance.currentUser`** so a restored session opens the dashboard without flashing the login UI unnecessarily.
+- **Sign-out**: Dashboard app bar **logout** icon calls `FirebaseAuth.instance.signOut()`; `AuthGate` then shows `LoginScreen` again.
+- **Routing**: The app does **not** use a named `/login` route as the initial stack entry; unauthenticated users never reach the dashboard through the previous “tap Login without credentials” path.
+- **Admin users**: Create users in **Firebase Console → Authentication → Users** (e.g. for development). **Do not** commit passwords or service accounts to the repository. In **Authentication → Sign-in method**, enable **Email/Password**.
+
+Firestore **security rules** should require authentication (and appropriate roles, if you add them later) for production data.
+
+---
+
+## 6. Firebase collections (typical)
 
 | Collection | Purpose |
 |------------|---------|
 | `Department` | Departments (`dept_name`) |
 | `Programs` | Programs (`program_name`, `branch_name`, `department_id`) |
 | `Faculty` | Faculty (`faculty_name`, `department_id`, …) |
-| `Subjects` | Subjects (`subject_name`, `program_id`, `credits`, **`is_lab`**) — see §7 for meaning of `is_lab` |
+| `Subjects` | Subjects (`subject_name`, `program_id`, `credits`, **`is_lab`**) — see §8 for meaning of `is_lab` |
 | `Rooms` | Rooms (`room_name`, **`room_type`**: canonical **`classroom`** or **`lab`** (lowercase in Firestore; UI may show title case), `capacity`) |
 | `Mappings` | Per program: `subject_id`, `faculty_id`, **`theory_room_id`**, optional **`lab_room_id`** (required when subject `is_lab` is true), legacy **`room_id`** (mirrors `theory_room_id` on save), optional `department_id`, `created_at` |
 | `config` / `timetable` doc | `working_days` / `working_days_per_week`, `periods` / `periods_per_day`, … |
@@ -67,7 +82,7 @@ Collection name casing may vary (`Programs` vs `programs`); `TimetableService` t
 
 ---
 
-## 6. Timetable generation flow
+## 7. Timetable generation flow
 
 1. **`prepareTimetableData()`** — Loads programs, **mappings filtered by `program_id`**, subjects per program, rooms, config. Builds per program:
    - `facultyMap[subjectId]`
@@ -84,7 +99,7 @@ Entry points: **Overview → Generate Timetable**, or **Timetable Configuration 
 
 ---
 
-## 7. Scheduling constraints (important)
+## 8. Scheduling constraints (important)
 
 ### Subject flag `is_lab` (critical)
 
@@ -111,12 +126,14 @@ If a subject has **no mapping**, **missing required room ids**, or **wrong room 
 
 ---
 
-## 8. Navigation flow
+## 9. Navigation flow
 
 ```text
-Login → Dashboard
+Sign in (valid Firebase Auth user) → Dashboard
   → My Timetables → + New Timetable → Overview
   → View Calendar
+
+Dashboard → Sign out → Login
 
 Overview
   → Institute Data (department, program, faculty, subject, room, mapping)
@@ -129,29 +146,30 @@ Timetable Configuration screen: save config, prepare data, optional stepwise lab
 
 ---
 
-## 9. Screens overview
+## 10. Screens overview
 
 | Area | Screen |
 |------|--------|
-| Auth | `LoginScreen` (welcome header, centered sign-in card, Material 3 styling — same card radius/shadow language as admin forms) |
-| Admin | `DashboardScreen`, `OverviewScreen`, `MyTimetablesScreen`, `InstituteDataScreen`, `LectureConfigurationScreen`, `TimetableConfigScreen` |
+| Auth | `LoginScreen` (email/password, validation, loading state); `AuthGate` (session routing at app root) |
+| Admin | `DashboardScreen` (greeting from signed-in user, **logout** in app bar), `OverviewScreen`, `MyTimetablesScreen`, `InstituteDataScreen`, `LectureConfigurationScreen`, `TimetableConfigScreen` |
 | Forms | Add department/program/faculty/subject/**room**/**mapping** |
 | Views | `ViewTimetableScreen`, `FacultyScheduleScreen`, `CalendarScreen` |
 
 ---
 
-## 10. Current implementation status
+## 11. Current implementation status
 
-- Firebase wiring and **named routes** (including `/my-timetables`, `/calendar`)
+- **Firebase Auth** wired with **`AuthGate`** as `MaterialApp` `home`; email/password sign-in and dashboard **sign out**
+- **Named routes** for admin and views (e.g. `/my-timetables`, `/calendar`); initial UI is **not** an anonymous dashboard
 - **Mappings** store `theory_room_id` + optional `lab_room_id` (+ `room_id` mirror for legacy reads)
 - **Room types**: `RoomTypeUtils` + Add Room persist **`classroom`** / **`lab`**; mapping dropdowns and the scheduler filter on those values only (legacy title-case strings that normalize to the same tokens still work).
 - **Add Mapping** UI: Department → Program → Subject → Faculty → **Theory room** (rooms with `room_type == classroom`) → **Lab room** (only when subject `is_lab` is true; `room_type == lab` only)
-- **Timetable engine** uses the credit split and dual rooms as in §6–7
+- **Timetable engine** uses the credit split and dual rooms as in §7–8
 - **UI** resolves IDs to names; `TimetableGrid` labels lab slots with **(LAB)** and tints lab rows
 
 ---
 
-## 11. Future enhancements
+## 12. Future enhancements
 
 - Soft constraints (preferred time slots, max consecutive lectures)
 - Edit / drag timetable after generation
@@ -168,4 +186,4 @@ flutter pub get
 flutter run
 ```
 
-Ensure `firebase_options.dart` matches your Firebase project and Firestore security rules allow admin clients to read/write the collections above.
+Ensure `firebase_options.dart` matches your Firebase project. Enable **Email/Password** in the Firebase console, create at least one admin user for testing, and configure **Firestore security rules** (and optionally **App Check**) so only authenticated clients can access sensitive data.
