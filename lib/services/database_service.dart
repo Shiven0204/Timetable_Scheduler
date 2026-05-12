@@ -1,9 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
-
-  // Department Collection Reference
 
   Future<void> saveDepartment(String name) async {
     try {
@@ -16,14 +15,12 @@ class DatabaseService {
         'created_at': FieldValue.serverTimestamp(),
       });
 
-      print(" Department saved successfully");
+      debugPrint('Department saved successfully');
     } catch (e) {
-      print("❌ Error saving department: $e");
+      debugPrint('Error saving department: $e');
       rethrow;
     }
   }
-
-  // Program Collection Reference
 
   Future<void> saveProgram({
     required String programName,
@@ -43,15 +40,12 @@ class DatabaseService {
         'created_at': FieldValue.serverTimestamp(),
       });
 
-
-      print(" Program saved successfully");
+      debugPrint('Program saved successfully');
     } catch (e) {
-      print("❌ Error saving program: $e");
+      debugPrint('Error saving program: $e');
       rethrow;
     }
   }
-
-  // Faculty Collection Reference
 
   Future<void> saveFaculty({
     required String facultyName,
@@ -74,14 +68,12 @@ class DatabaseService {
         'created_at': FieldValue.serverTimestamp(),
       });
 
-      print("✅ Faculty saved successfully");
+      debugPrint('Faculty saved successfully');
     } catch (e) {
-      print("❌ Error saving faculty: $e");
+      debugPrint('Error saving faculty: $e');
       rethrow;
     }
   }
-
-  // Subject Collection Reference
 
   Future<void> saveSubject({
     required String subjectName,
@@ -102,37 +94,40 @@ class DatabaseService {
         'created_at': FieldValue.serverTimestamp(),
       });
 
-      print(" Subject saved successfully");
+      debugPrint('Subject saved successfully');
     } catch (e) {
-      print("❌ Error saving subject: $e");
+      debugPrint('Error saving subject: $e');
       rethrow;
     }
   }
-
-  //Mapping Collection Reference
 
   Future<void> saveMapping({
     required String facultyId,
     required String subjectId,
     required String programId,
+    required String roomId,
+    String? departmentId,
   }) async {
     try {
-      await _db.collection('Mappings').add({
+      final data = <String, dynamic>{
         'faculty_id': facultyId,
         'subject_id': subjectId,
         'program_id': programId,
+        'room_id': roomId,
         'created_at': FieldValue.serverTimestamp(),
-      });
+      };
+      if (departmentId != null && departmentId.trim().isNotEmpty) {
+        data['department_id'] = departmentId.trim();
+      }
+      await _db.collection('Mappings').add(data);
 
-      print(" Mapping saved");
-
+      debugPrint('Mapping saved');
     } catch (e) {
-      print(" Error saving mapping: $e");
+      debugPrint('Error saving mapping: $e');
       rethrow;
     }
   }
 
-// Room Collection Reference
   Future<void> saveRoom({
     required String roomName,
     required String roomType,
@@ -150,10 +145,9 @@ class DatabaseService {
         'created_at': FieldValue.serverTimestamp(),
       });
 
-      print("Room saved successfully");
-
+      debugPrint('Room saved successfully');
     } catch (e) {
-      print("Error saving room: $e");
+      debugPrint('Error saving room: $e');
       rethrow;
     }
   }
