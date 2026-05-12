@@ -1,12 +1,24 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:timetable_scheduler/routes/app_routes.dart';
 
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({super.key});
 
-  static const _userName = 'Shiven';
   static const _instituteName = 'Tech Institute';
-  static const _roleLabel = 'Owner';
+  static const _roleLabel = 'Administrator';
+
+  String _displayName(User? user) {
+    if (user == null) return 'User';
+    final name = user.displayName?.trim();
+    if (name != null && name.isNotEmpty) return name;
+    final email = user.email?.trim();
+    if (email != null && email.isNotEmpty) {
+      final local = email.split('@').first;
+      if (local.isNotEmpty) return local;
+    }
+    return 'User';
+  }
 
   String _greetingForNow() {
     final h = DateTime.now().hour;
@@ -19,10 +31,21 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final greeting = _greetingForNow();
+    final user = FirebaseAuth.instance.currentUser;
+    final userName = _displayName(user);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dashboard'),
+        actions: [
+          IconButton(
+            tooltip: 'Sign out',
+            icon: const Icon(Icons.logout_rounded),
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
@@ -30,7 +53,7 @@ class DashboardScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '$greeting, $_userName',
+              '$greeting, $userName',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w800,
                     letterSpacing: -0.5,

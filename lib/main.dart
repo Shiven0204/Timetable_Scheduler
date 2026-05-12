@@ -14,7 +14,7 @@ import 'package:timetable_scheduler/screens/admin/lecture_configuration_screen.d
 import 'package:timetable_scheduler/screens/admin/my_timetables_screen.dart';
 import 'package:timetable_scheduler/screens/admin/overview_screen.dart';
 import 'package:timetable_scheduler/screens/admin/timetable_config_screen.dart';
-import 'package:timetable_scheduler/screens/auth/login_screen.dart';
+import 'package:timetable_scheduler/widgets/auth_gate.dart';
 import 'package:timetable_scheduler/screens/admin/add_mapping_screen.dart';
 import 'package:timetable_scheduler/screens/faculty/faculty_schedule_screen.dart';
 import 'package:timetable_scheduler/screens/calendar/calendar_screen.dart';
@@ -37,9 +37,8 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      initialRoute: AppRoutes.login,
+      home: const AuthGate(),
       routes: {
-        AppRoutes.login: (context) => const LoginScreen(),
         AppRoutes.dashboard: (context) => const DashboardScreen(),
         AppRoutes.overview: (context) => const OverviewScreen(),
         AppRoutes.timetableConfig: (context) => const TimetableConfigScreen(),

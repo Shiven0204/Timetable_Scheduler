@@ -1,14 +1,81 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:timetable_scheduler/routes/app_routes.dart';
+import 'package:timetable_scheduler/utils/auth_error_messages.dart';
 
-class LoginScreen extends StatelessWidget {
+class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  @override
+  State<LoginScreen> createState() => _LoginScreenState();
+}
+
+class _LoginScreenState extends State<LoginScreen> {
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _auth = FirebaseAuth.instance;
+
+  bool _loading = false;
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,
       border: const OutlineInputBorder(),
     );
+  }
+
+  bool _isValidEmailFormat(String email) {
+    final trimmed = email.trim();
+    if (trimmed.isEmpty) return false;
+    return RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(trimmed);
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> _onLogin() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+
+    if (email.isEmpty) {
+      _showSnack('Please enter your email.');
+      return;
+    }
+    if (!_isValidEmailFormat(email)) {
+      _showSnack('Please enter a valid email address.');
+      return;
+    }
+    if (password.isEmpty) {
+      _showSnack('Please enter your password.');
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      await _auth.signInWithEmailAndPassword(email: email, password: password);
+      if (!mounted) return;
+      // [AuthGate] rebuilds to dashboard when auth state updates.
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      _showSnack(messageForFirebaseAuth(e));
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack('Something went wrong. Please try again.');
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
   }
 
   @override
@@ -96,26 +163,36 @@ class LoginScreen extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 20),
                                 TextField(
+                                  controller: _emailController,
                                   keyboardType: TextInputType.emailAddress,
                                   autocorrect: false,
+                                  textInputAction: TextInputAction.next,
+                                  enabled: !_loading,
                                   decoration: _inputDecoration('Email'),
                                 ),
                                 const SizedBox(height: 16),
                                 TextField(
+                                  controller: _passwordController,
                                   obscureText: true,
+                                  textInputAction: TextInputAction.done,
+                                  onSubmitted: _loading ? null : (_) => _onLogin(),
+                                  enabled: !_loading,
                                   decoration: _inputDecoration('Password'),
                                 ),
                                 const SizedBox(height: 24),
                                 SizedBox(
                                   height: 48,
                                   child: FilledButton(
-                                    onPressed: () {
-                                      Navigator.pushNamed(
-                                        context,
-                                        AppRoutes.dashboard,
-                                      );
-                                    },
-                                    child: const Text('Login'),
+                                    onPressed: _loading ? null : _onLogin,
+                                    child: _loading
+                                        ? const SizedBox(
+                                            height: 22,
+                                            width: 22,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                        : const Text('Login'),
                                   ),
                                 ),
                               ],
