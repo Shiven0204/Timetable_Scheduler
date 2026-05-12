@@ -11,11 +11,13 @@ import 'package:timetable_scheduler/screens/admin/add_subject_screen.dart';
 import 'package:timetable_scheduler/screens/admin/dashboard_screen.dart';
 import 'package:timetable_scheduler/screens/admin/institute_data_screen.dart';
 import 'package:timetable_scheduler/screens/admin/lecture_configuration_screen.dart';
+import 'package:timetable_scheduler/screens/admin/my_timetables_screen.dart';
 import 'package:timetable_scheduler/screens/admin/overview_screen.dart';
 import 'package:timetable_scheduler/screens/admin/timetable_config_screen.dart';
 import 'package:timetable_scheduler/screens/auth/login_screen.dart';
 import 'package:timetable_scheduler/screens/admin/add_mapping_screen.dart';
 import 'package:timetable_scheduler/screens/faculty/faculty_schedule_screen.dart';
+import 'package:timetable_scheduler/screens/calendar/calendar_screen.dart';
 import 'package:timetable_scheduler/screens/student/view_timetable_screen.dart';
 
 void main() async {
@@ -52,6 +54,8 @@ class MyApp extends StatelessWidget {
         AppRoutes.instituteData: (context) => const InstituteDataScreen(),
         AppRoutes.lectureConfiguration: (context) =>
             const LectureConfigurationScreen(),
+        AppRoutes.myTimetables: (context) => const MyTimetablesScreen(),
+        AppRoutes.calendar: (context) => const CalendarScreen(),
       },
     );
   }

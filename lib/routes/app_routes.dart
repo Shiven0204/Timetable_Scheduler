@@ -13,4 +13,6 @@ class AppRoutes {
   static const facultySchedule = '/faculty-schedule';
   static const instituteData = '/institute-data';
   static const lectureConfiguration = '/lecture-configuration';
+  static const myTimetables = '/my-timetables';
+  static const calendar = '/calendar';
 }

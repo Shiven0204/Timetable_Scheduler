@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -16,9 +17,9 @@ class DatabaseService {
         'created_at': FieldValue.serverTimestamp(),
       });
 
-      print("✅ Department saved successfully");
+      debugPrint('Department saved successfully');
     } catch (e) {
-      print("❌ Error saving department: $e");
+      debugPrint('Error saving department: $e');
       rethrow;
     }
   }
@@ -44,9 +45,9 @@ class DatabaseService {
     });
 
 
-    print("✅ Program saved successfully");
+    debugPrint('Program saved successfully');
   } catch (e) {
-    print("❌ Error saving program: $e");
+    debugPrint('Error saving program: $e');
     rethrow;
   }
 }
@@ -74,9 +75,9 @@ class DatabaseService {
         'created_at': FieldValue.serverTimestamp(),
       });
 
-      print("✅ Faculty saved successfully");
+      debugPrint('Faculty saved successfully');
     } catch (e) {
-      print("❌ Error saving faculty: $e");
+      debugPrint('Error saving faculty: $e');
       rethrow;
     }
   }
@@ -102,9 +103,9 @@ class DatabaseService {
         'created_at': FieldValue.serverTimestamp(),
       });
 
-      print("✅ Subject saved successfully");
+      debugPrint('Subject saved successfully');
     } catch (e) {
-      print("❌ Error saving subject: $e");
+      debugPrint('Error saving subject: $e');
       rethrow;
     }
   }
@@ -124,10 +125,10 @@ class DatabaseService {
       'created_at': FieldValue.serverTimestamp(),
     });
 
-    print("✅ Mapping saved");
+    debugPrint('Mapping saved');
 
   } catch (e) {
-    print("❌ Error saving mapping: $e");
+    debugPrint('Error saving mapping: $e');
     rethrow;
   }
 }

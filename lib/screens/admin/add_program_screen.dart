@@ -30,6 +30,7 @@ class _AddProgramScreenState extends State<AddProgramScreen> {
         .collection('Department') 
         .get();
 
+    if (!mounted) return;
     setState(() {
       _departments = snapshot.docs.map((doc) {
         return {
@@ -66,6 +67,7 @@ class _AddProgramScreenState extends State<AddProgramScreen> {
         branchName: branch,
         departmentId: _selectedDepartmentId!,
       );
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Program saved')),
@@ -79,6 +81,7 @@ class _AddProgramScreenState extends State<AddProgramScreen> {
       });
 
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );

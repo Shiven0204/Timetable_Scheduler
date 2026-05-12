@@ -31,6 +31,7 @@ class _AddFacultyScreenState extends State<AddFacultyScreen> {
         .collection('Department')
         .get();
 
+    if (!mounted) return;
     setState(() {
       _departments = snapshot.docs.map((doc) {
         return {'id': doc.id, 'name': doc['dept_name']};
@@ -79,6 +80,7 @@ class _AddFacultyScreenState extends State<AddFacultyScreen> {
         maxLecturesPerDay: maxLectures,
         departmentId: _selectedDepartmentId!,
       );
+      if (!mounted) return;
 
       ScaffoldMessenger.of(
         context,
@@ -93,6 +95,7 @@ class _AddFacultyScreenState extends State<AddFacultyScreen> {
         _selectedDepartmentId = null;
       });
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error: $e')));

@@ -32,6 +32,7 @@ class _AddSubjectScreenState extends State<AddSubjectScreen> {
         .collection('Programs')
         .get();
 
+    if (!mounted) return;
     setState(() {
       _programs = snapshot.docs.map((doc) {
         return {
@@ -72,6 +73,7 @@ class _AddSubjectScreenState extends State<AddSubjectScreen> {
         isLab: _isLab,
         programId: _selectedProgramId!,
       );
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Subject saved')),
@@ -86,6 +88,7 @@ class _AddSubjectScreenState extends State<AddSubjectScreen> {
       });
 
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
       );

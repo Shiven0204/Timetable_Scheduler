@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-// ignore: unused_import
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:timetable_scheduler/services/database_service.dart';
 
 class AddDepartmentScreen extends StatefulWidget {
@@ -34,6 +32,7 @@ class _AddDepartmentScreenState extends State<AddDepartmentScreen> {
     try {
       // Save to Firebase
       await _dbService.saveDepartment(name);
+      if (!mounted) return;
 
       // Success message
       ScaffoldMessenger.of(context).showSnackBar(
@@ -44,6 +43,7 @@ class _AddDepartmentScreenState extends State<AddDepartmentScreen> {
       _nameController.clear();
 
     } catch (e) {
+      if (!mounted) return;
       // Error message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
