@@ -1,5 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:timetable_scheduler/services/timetable_firestore_helpers.dart';
+import 'package:timetable_scheduler/services/timetable_name_resolver.dart';
+import 'package:timetable_scheduler/services/timetable_service.dart';
+import 'package:timetable_scheduler/widgets/timetable_grid.dart';
 
 class ViewTimetableScreen extends StatefulWidget {
   const ViewTimetableScreen({super.key});
@@ -10,15 +14,10 @@ class ViewTimetableScreen extends StatefulWidget {
 
 class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
+  final TimetableService _timetableService = TimetableService();
+  final TimetableNameResolver _nameResolver = TimetableNameResolver();
 
-  static const List<String> _days = [
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-  ];
-
+  List<String> _dayNames = List<String>.from(_defaultDays);
   List<Map<String, dynamic>> _programs = [];
   String? _selectedProgramId;
   bool _loadingPrograms = true;
@@ -26,9 +25,15 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
   String? _errorMessage;
   int _periodsPerDay = 6;
 
-  Map<String, List<Map<String, dynamic>?>> _grid = {
-    for (final day in _days) day: List<Map<String, dynamic>?>.filled(6, null),
-  };
+  Map<String, List<Map<String, dynamic>?>> _grid = {};
+
+  static const List<String> _defaultDays = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+  ];
 
   @override
   void initState() {
@@ -48,29 +53,43 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
         'Programs',
       ]);
 
+      if (!mounted) return;
+
       final programs = programsSnapshot.docs
           .map((doc) => {'id': doc.id, ...doc.data()})
           .toList();
 
+      final dayNames = await _timetableService.getWorkingDayNames();
+      if (!mounted) return;
+
       final configDoc = await _db.collection('config').doc('timetable').get();
+      if (!mounted) return;
+
       final periods = (configDoc.data()?['periods_per_day'] as num?)?.toInt() ??
           (configDoc.data()?['periods'] as num?)?.toInt() ??
           6;
 
       setState(() {
         _programs = programs;
+        _dayNames = dayNames.isNotEmpty ? dayNames : _defaultDays;
         _periodsPerDay = periods;
-        _grid = _emptyGrid(periods);
-        _selectedProgramId = programs.isNotEmpty ? programs.first['id'] as String : null;
+        _grid = TimetableFirestoreHelpers.emptyGridForDays(
+          orderedDayNames: _dayNames,
+          periodsPerDay: periods,
+        );
+        _selectedProgramId =
+            programs.isNotEmpty ? programs.first['id'] as String : null;
       });
 
       if (_selectedProgramId != null) {
         await getTimetableByProgram(_selectedProgramId!);
       }
     } catch (_) {
-      setState(() {
-        _errorMessage = 'Failed to load programs';
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to load programs. Check your connection.';
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -84,7 +103,10 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
     setState(() {
       _loadingTimetable = true;
       _errorMessage = null;
-      _grid = _emptyGrid(_periodsPerDay);
+      _grid = TimetableFirestoreHelpers.emptyGridForDays(
+        orderedDayNames: _dayNames,
+        periodsPerDay: _periodsPerDay,
+      );
     });
 
     try {
@@ -92,6 +114,8 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
           .collection('timetable')
           .where('program_id', isEqualTo: programId)
           .get();
+
+      if (!mounted) return;
 
       if (timetableSnapshot.docs.isEmpty) {
         setState(() {
@@ -114,59 +138,30 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
         if (roomId.isNotEmpty) roomIds.add(roomId);
       }
 
-      final subjectMap = await _fetchNameMapByIds(
-        ids: subjectIds,
-        collectionCandidates: ['subjects', 'Subjects'],
-        nameFieldCandidates: ['subject_name', 'name'],
-      );
-      final facultyMap = await _fetchNameMapByIds(
-        ids: facultyIds,
-        collectionCandidates: ['faculty', 'Faculty'],
-        nameFieldCandidates: ['faculty_name', 'name'],
-      );
-      final roomMap = await _fetchNameMapByIds(
-        ids: roomIds,
-        collectionCandidates: ['rooms', 'Rooms', 'Room'],
-        nameFieldCandidates: ['room_name', 'name'],
+      final names = await _nameResolver.resolve(
+        subjectIds: subjectIds,
+        facultyIds: facultyIds,
+        roomIds: roomIds,
       );
 
-      final nextGrid = _emptyGrid(_periodsPerDay);
-      for (final doc in timetableSnapshot.docs) {
-        final data = doc.data();
-        final dayValue = data['day'];
-        final periodValue = data['period'];
+      if (!mounted) return;
 
-        final dayIndex = dayValue is num ? dayValue.toInt() : int.tryParse('$dayValue');
-        final periodIndex =
-            periodValue is num ? periodValue.toInt() : int.tryParse('$periodValue');
-        if (dayIndex == null ||
-            periodIndex == null ||
-            dayIndex < 0 ||
-            dayIndex >= _days.length ||
-            periodIndex < 0 ||
-            periodIndex >= _periodsPerDay) {
-          continue;
-        }
-
-        final dayName = _days[dayIndex];
-        final subjectId = (data['subject_id'] ?? '').toString();
-        final facultyId = (data['faculty_id'] ?? '').toString();
-        final roomId = (data['room_id'] ?? '').toString();
-
-        nextGrid[dayName]![periodIndex] = {
-          'subject': subjectMap[subjectId] ?? subjectId,
-          'faculty': facultyMap[facultyId] ?? '',
-          'room': roomMap[roomId] ?? '',
-        };
-      }
+      final nextGrid = TimetableFirestoreHelpers.buildProgramViewGrid(
+        docs: timetableSnapshot.docs,
+        orderedDayNames: _dayNames,
+        periodsPerDay: _periodsPerDay,
+        names: names,
+      );
 
       setState(() {
         _grid = nextGrid;
       });
     } catch (_) {
-      setState(() {
-        _errorMessage = 'Failed to load timetable';
-      });
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to load timetable from Firestore.';
+        });
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -174,13 +169,6 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
         });
       }
     }
-  }
-
-  Map<String, List<Map<String, dynamic>?>> _emptyGrid(int periods) {
-    return {
-      for (final day in _days)
-        day: List<Map<String, dynamic>?>.filled(periods, null),
-    };
   }
 
   Future<QuerySnapshot<Map<String, dynamic>>> _firstNonEmpty(
@@ -197,129 +185,7 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
     return fallback ?? await _db.collection(collections.first).get();
   }
 
-  Future<Map<String, String>> _fetchNameMapByIds({
-    required Set<String> ids,
-    required List<String> collectionCandidates,
-    required List<String> nameFieldCandidates,
-  }) async {
-    if (ids.isEmpty) {
-      return {};
-    }
-
-    for (final collection in collectionCandidates) {
-      final result = <String, String>{};
-      var foundAny = false;
-
-      for (final id in ids) {
-        final doc = await _db.collection(collection).doc(id).get();
-        if (!doc.exists) {
-          continue;
-        }
-        foundAny = true;
-        final data = doc.data() ?? {};
-        String name = id;
-        for (final field in nameFieldCandidates) {
-          final value = data[field];
-          if (value != null && value.toString().trim().isNotEmpty) {
-            name = value.toString();
-            break;
-          }
-        }
-        result[id] = name;
-      }
-
-      if (foundAny) {
-        return result;
-      }
-    }
-    return {for (final id in ids) id: id};
-  }
-
-  bool get _isGridEmpty {
-    for (final day in _days) {
-      final row = _grid[day] ?? [];
-      if (row.any((cell) => cell != null)) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  Widget _buildTable() {
-    final borderColor = Colors.grey.shade400;
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: Table(
-        defaultColumnWidth: const FixedColumnWidth(120),
-        border: TableBorder.all(color: borderColor, width: 1),
-        children: [
-          TableRow(
-            decoration: const BoxDecoration(color: Color(0xFFF2F2F2)),
-            children: [
-              _cell('Day', isHeader: true),
-              for (var p = 0; p < _periodsPerDay; p++) _cell('P${p + 1}', isHeader: true),
-            ],
-          ),
-          for (final day in _days)
-            TableRow(
-              children: [
-                _cell(day, isHeader: true),
-                for (var p = 0; p < _periodsPerDay; p++) _slotCell(_grid[day]![p]),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _cell(String text, {bool isHeader = false}) {
-    return Padding(
-      padding: const EdgeInsets.all(8),
-      child: Text(
-        text,
-        textAlign: TextAlign.center,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: isHeader ? FontWeight.w600 : FontWeight.normal,
-        ),
-      ),
-    );
-  }
-
-  Widget _slotCell(Map<String, dynamic>? slot) {
-    if (slot == null) {
-      return _cell('-');
-    }
-    final subject = (slot['subject'] ?? '-').toString();
-    final faculty = (slot['faculty'] ?? '').toString();
-    final room = (slot['room'] ?? '').toString();
-
-    return Padding(
-      padding: const EdgeInsets.all(6),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            subject,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
-          ),
-          if (faculty.isNotEmpty)
-            Text(
-              faculty,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 10),
-            ),
-          if (room.isNotEmpty)
-            Text(
-              room,
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 10),
-            ),
-        ],
-      ),
-    );
-  }
+  bool get _isGridEmpty => TimetableFirestoreHelpers.isGridEmpty(_grid);
 
   @override
   Widget build(BuildContext context) {
@@ -355,7 +221,8 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
                         (program) => DropdownMenuItem<String>(
                           value: program['id'] as String,
                           child: Text(
-                            (program['program_name'] ?? program['id']).toString(),
+                            (program['program_name'] ?? program['id'])
+                                .toString(),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
@@ -380,7 +247,15 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
               )
             else if (_errorMessage != null)
               Expanded(
-                child: Center(child: Text(_errorMessage!)),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Text(
+                      _errorMessage!,
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
               )
             else if (_selectedProgramId == null)
               const Expanded(
@@ -388,7 +263,9 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
               )
             else if (_isGridEmpty)
               const Expanded(
-                child: Center(child: Text('No timetable available')),
+                child: Center(
+                  child: Text('No timetable for this program yet.'),
+                ),
               )
             else
               Expanded(
@@ -400,7 +277,12 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
                   child: Padding(
                     padding: const EdgeInsets.all(10),
                     child: SingleChildScrollView(
-                      child: _buildTable(),
+                      child: TimetableGrid(
+                        days: _dayNames,
+                        periodsPerDay: _periodsPerDay,
+                        grid: _grid,
+                        mode: TimetableGridMode.programView,
+                      ),
                     ),
                   ),
                 ),
@@ -411,4 +293,3 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
     );
   }
 }
-

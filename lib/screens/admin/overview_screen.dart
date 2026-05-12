@@ -19,15 +19,15 @@ class _OverviewScreenState extends State<OverviewScreen> {
     });
 
     try {
-      await _timetableService.generateTimetable();
+      await _timetableService.generateFullTimetableFromPreparedData();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Timetable generated successfully')),
       );
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to generate timetable')),
+        SnackBar(content: Text('Unable to generate timetable: $e')),
       );
     } finally {
       if (mounted) {

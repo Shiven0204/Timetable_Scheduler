@@ -305,11 +305,81 @@ class TimetableService {
     }
   }
 
-  Future<Map<String, dynamic>> generateFullTimetableFromPreparedData() async {
+  /// Generates lab + theory timetable and, by default, replaces the `timetable`
+  /// collection with flat documents the UI expects (`program_id`, `day`,
+  /// `period`, ids, `type`).
+  Future<Map<String, dynamic>> generateFullTimetableFromPreparedData({
+    bool persistToFirestore = true,
+  }) async {
     final timetableData = await prepareTimetableData();
     final emptyGrid = await createEmptyTimetableGrid();
     final withLabs = await scheduleLabs(emptyGrid, timetableData);
-    return scheduleTheorySubjects(withLabs, timetableData);
+    final result = await scheduleTheorySubjects(withLabs, timetableData);
+    if (persistToFirestore) {
+      await persistNestedTimetableToFirestore(result);
+    }
+    return result;
+  }
+
+  /// Working day labels (Monday, …) derived from saved config.
+  Future<List<String>> getWorkingDayNames() async {
+    final config = await getConfig();
+    final n = (config['working_days_per_week'] as int?) ?? 5;
+    return _buildDayNames(n);
+  }
+
+  /// Converts nested in-memory grid to Firestore rows and batch-writes them.
+  Future<void> persistNestedTimetableToFirestore(
+    Map<String, dynamic> timetable,
+  ) async {
+    if (timetable.isEmpty) {
+      throw Exception('No timetable data to save');
+    }
+
+    final config = await getConfig();
+    final dayOrder = _buildDayNames(
+      (config['working_days_per_week'] as int?) ?? 5,
+    );
+    final rows = <Map<String, dynamic>>[];
+
+    for (final programEntry in timetable.entries) {
+      final programId = programEntry.key;
+      final dayGrid =
+          (programEntry.value as Map<String, dynamic>? ?? <String, dynamic>{});
+
+      for (final dayName in dayOrder) {
+        final dayIndex = dayOrder.indexOf(dayName);
+        if (dayIndex < 0) {
+          continue;
+        }
+        final slots = (dayGrid[dayName] as List<dynamic>? ?? []);
+        for (var period = 0; period < slots.length; period++) {
+          final raw = slots[period];
+          if (raw is! Map<String, dynamic>) {
+            continue;
+          }
+          final subjectId = (raw['subject_id'] ?? '').toString();
+          if (subjectId.isEmpty) {
+            continue;
+          }
+          rows.add({
+            'program_id': programId,
+            'day': dayIndex,
+            'period': period,
+            'subject_id': subjectId,
+            'faculty_id': (raw['faculty_id'] ?? '').toString(),
+            'room_id': (raw['room_id'] ?? '').toString(),
+            'type': (raw['type'] ?? 'theory').toString(),
+            'created_at': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    }
+
+    if (rows.isEmpty) {
+      throw Exception('No timetable rows generated (empty grid)');
+    }
+    await _saveTimetable(rows);
   }
 
   Future<Map<String, dynamic>> prepareTimetableData() async {
@@ -458,6 +528,7 @@ class TimetableService {
             'subject_id': slot.subjectId,
             'faculty_id': slot.facultyId,
             'room_id': slot.roomId,
+            'type': slot.type,
             'created_at': FieldValue.serverTimestamp(),
           });
         }
@@ -533,11 +604,13 @@ class TimetableService {
           subjectId: task.subjectId,
           facultyId: facultyId,
           roomId: roomId,
+          type: 'lab',
         );
         grid[day]![period + 1] = _Slot(
           subjectId: task.subjectId,
           facultyId: facultyId,
           roomId: roomId,
+          type: 'lab',
         );
 
         _markBusy(facultySchedule, facultyId, day, period);
@@ -577,6 +650,7 @@ class TimetableService {
           subjectId: task.subjectId,
           facultyId: facultyId,
           roomId: roomId,
+          type: 'theory',
         );
 
         _markBusy(facultySchedule, facultyId, day, period);
@@ -1013,19 +1087,24 @@ class TimetableService {
 
   Future<void> _saveTimetable(List<Map<String, dynamic>> rows) async {
     final existing = await _db.collection('timetable').get();
-    if (existing.docs.isNotEmpty) {
-      final deleteBatch = _db.batch();
-      for (final doc in existing.docs) {
-        deleteBatch.delete(doc.reference);
+    const chunk = 400;
+    for (var i = 0; i < existing.docs.length; i += chunk) {
+      final batch = _db.batch();
+      final end = (i + chunk < existing.docs.length) ? i + chunk : existing.docs.length;
+      for (var j = i; j < end; j++) {
+        batch.delete(existing.docs[j].reference);
       }
-      await deleteBatch.commit();
+      await batch.commit();
     }
 
-    final batch = _db.batch();
-    for (final row in rows) {
-      batch.set(_db.collection('timetable').doc(), row);
+    for (var i = 0; i < rows.length; i += chunk) {
+      final batch = _db.batch();
+      final end = (i + chunk < rows.length) ? i + chunk : rows.length;
+      for (var j = i; j < end; j++) {
+        batch.set(_db.collection('timetable').doc(), rows[j]);
+      }
+      await batch.commit();
     }
-    await batch.commit();
   }
 }
 
@@ -1040,16 +1119,19 @@ class _Slot {
     required this.subjectId,
     required this.facultyId,
     required this.roomId,
+    this.type = 'theory',
   });
 
   const _Slot.empty()
       : subjectId = '',
         facultyId = '',
-        roomId = '';
+        roomId = '',
+        type = 'theory';
 
   final String subjectId;
   final String facultyId;
   final String roomId;
+  final String type;
 
   bool get isEmpty => subjectId.isEmpty;
 }

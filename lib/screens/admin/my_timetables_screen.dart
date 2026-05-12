@@ -40,7 +40,7 @@ class MyTimetablesScreen extends StatelessWidget {
               },
               icon: const Icon(Icons.add_rounded),
               label: const Text(
-                '+ New Timetable',
+                'New Timetable',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
               ),
             ),

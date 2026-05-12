@@ -57,6 +57,7 @@ class _AddRoomScreenState extends State<AddRoomScreen> {
         roomType: _roomType!,
         capacity: capacity,
       );
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Room saved successfully')),
@@ -70,6 +71,7 @@ class _AddRoomScreenState extends State<AddRoomScreen> {
       });
 
     } catch (e) {
+      if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error: $e')),
