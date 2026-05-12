@@ -16,7 +16,7 @@ class DatabaseService {
         'created_at': FieldValue.serverTimestamp(),
       });
 
-      print("✅ Department saved successfully");
+      print(" Department saved successfully");
     } catch (e) {
       print("❌ Error saving department: $e");
       rethrow;
@@ -44,7 +44,7 @@ class DatabaseService {
     });
 
 
-    print("✅ Program saved successfully");
+    print(" Program saved successfully");
   } catch (e) {
     print("❌ Error saving program: $e");
     rethrow;
@@ -102,7 +102,7 @@ class DatabaseService {
         'created_at': FieldValue.serverTimestamp(),
       });
 
-      print("✅ Subject saved successfully");
+      print(" Subject saved successfully");
     } catch (e) {
       print("❌ Error saving subject: $e");
       rethrow;
@@ -124,10 +124,10 @@ class DatabaseService {
       'created_at': FieldValue.serverTimestamp(),
     });
 
-    print("✅ Mapping saved");
+    print(" Mapping saved");
 
   } catch (e) {
-    print("❌ Error saving mapping: $e");
+    print(" Error saving mapping: $e");
     rethrow;
   }
 }
