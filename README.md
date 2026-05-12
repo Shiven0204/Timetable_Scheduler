@@ -6,7 +6,7 @@ Flutter application for **institute timetable management**: master data (departm
 
 ## 1. Project overview
 
-Administrators configure the institute, map each subject to a faculty member and **specific room** (lab vs classroom), then generate a weekly timetable that respects **daily theory limits**, **two-period contiguous labs**, **faculty availability**, and **room conflicts**. Generated slots are stored in Firestore and shown across dashboard, student, faculty, and calendar screens.
+Administrators configure the institute, map each subject to a faculty member and **rooms** (classroom for theory, and when applicable a **separate lab room**), then generate a weekly timetable that respects **credit-based theory counts**, **one weekly 2-period lab block** for combined courses, **daily theory limits**, **faculty availability**, and **room conflicts**. Generated slots are stored in Firestore and shown across dashboard, student, faculty, and calendar screens.
 
 ---
 
@@ -15,7 +15,7 @@ Administrators configure the institute, map each subject to a faculty member and
 - Firebase Authentication and Firestore
 - Admin dashboard (quick actions: My Timetables, Calendar)
 - Overview hub: data setup, lecture configuration, generate timetable, navigation to views
-- CRUD-style flows: departments, programs, faculty, subjects, rooms, **mappings (with room)**
+- CRUD-style flows: departments, programs, faculty, subjects, rooms, **mappings (theory room + optional lab room)**
 - Timetable configuration (`working_days`, `periods_per_day`, etc.)
 - **Timetable engine**: lab scheduling → theory scheduling → **persist** flat `timetable` documents
 - **Student timetable** (by program), **faculty schedule** (by faculty), **calendar grid** (by program)
@@ -50,13 +50,20 @@ Administrators configure the institute, map each subject to a faculty member and
 | `Department` | Departments (`dept_name`) |
 | `Programs` | Programs (`program_name`, `branch_name`, `department_id`) |
 | `Faculty` | Faculty (`faculty_name`, `department_id`, …) |
-| `Subjects` | Subjects (`subject_name`, `program_id`, `credits`, `is_lab`) |
-| `Rooms` | Rooms (`room_name`, `room_type`: **Lab** / **Classroom**, `capacity`) |
-| `Mappings` | Per program: `subject_id`, `faculty_id`, **`room_id`**, `program_id`, optional `department_id`, `created_at` |
+| `Subjects` | Subjects (`subject_name`, `program_id`, `credits`, **`is_lab`**) — see §7 for meaning of `is_lab` |
+| `Rooms` | Rooms (`room_name`, **`room_type`**: canonical **`classroom`** or **`lab`** (lowercase in Firestore; UI may show title case), `capacity`) |
+| `Mappings` | Per program: `subject_id`, `faculty_id`, **`theory_room_id`**, optional **`lab_room_id`** (required when subject `is_lab` is true), legacy **`room_id`** (mirrors `theory_room_id` on save), optional `department_id`, `created_at` |
 | `config` / `timetable` doc | `working_days` / `working_days_per_week`, `periods` / `periods_per_day`, … |
 | `timetable` | Generated slots: `program_id`, `day` (0-based), `period`, `subject_id`, `faculty_id`, `room_id`, `type` (`lab` / `theory`), `created_at` |
 
 Collection name casing may vary (`Programs` vs `programs`); `TimetableService` tries common variants when reading.
+
+### Room type system (`classroom` vs `lab`)
+
+- **Firestore** stores **`room_type`** as lowercase **`classroom`** or **`lab`** only (Add Room writes through `RoomTypeUtils`).
+- **UI** labels remain **Classroom** / **Lab** for readability.
+- **Add Mapping**: theory dropdown lists only **`classroom`** rooms; lab dropdown (when `is_lab` is true) lists only **`lab`** rooms.
+- **Timetable engine**: theory periods always use the mapped **`theory_room_id`** (must resolve to a classroom); lab blocks use **`lab_room_id`** (must resolve to a lab). Legacy **`room_id`** on a mapping is treated as **`theory_room_id`** for backward compatibility.
 
 ---
 
@@ -64,10 +71,13 @@ Collection name casing may vary (`Programs` vs `programs`); `TimetableService` t
 
 1. **`prepareTimetableData()`** — Loads programs, **mappings filtered by `program_id`**, subjects per program, rooms, config. Builds per program:
    - `facultyMap[subjectId]`
-   - **`roomMap[subjectId]`** (from mapping; validated: lab subject → lab room, theory → non-lab room)
+   - **`theoryRoomMap[subjectId]`** from `theory_room_id` (fallback: legacy `room_id`) — room document must have **`room_type == classroom`**
+   - **`labRoomMap[subjectId]`** from `lab_room_id` — required when subject has `is_lab == true`; room document must have **`room_type == lab`**
 2. **`createEmptyTimetableGrid()`** — For each program, empty lists per weekday × periods.
-3. **`scheduleLabs()`** — For each **lab** subject with valid mapping: place **exactly one** contiguous **2-period** block using **mapped `room_id`**, respecting faculty/room occupancy.
-4. **`scheduleTheorySubjects()`** — For each **theory** subject (deduped by `subject_id`): for each **credit**, place one period on a day where that subject **has not yet appeared that day**, using **mapped classroom `room_id`**, respecting conflicts.
+3. **`scheduleLabs()`** — For each subject with **`is_lab == true`**: place **one** contiguous **2-period** block using **`lab_room_id`**, respecting faculty/room occupancy.
+4. **`scheduleTheorySubjects()`** — For **every** subject that has theory periods this week (including `is_lab == true` courses): place **`theoryPeriodsPerWeek`** slots using **`theory_room_id`**, at most **one theory slot per subject per day**, respecting conflicts. Theory period count:
+   - `is_lab == false` → **all** `credits` are theory lectures.
+   - `is_lab == true` → **`credits - 1`** theory lectures **plus** the single lab block above (e.g. 4 credits → 3 theory + 1 lab session).
 5. **`persistNestedTimetableToFirestore()`** — Flattens nested grid to `timetable` documents (replaces previous batch).
 
 Entry points: **Overview → Generate Timetable**, or **Timetable Configuration → Generate Full Timetable** (same pipeline; optional `persistToFirestore` flag in code).
@@ -76,17 +86,28 @@ Entry points: **Overview → Generate Timetable**, or **Timetable Configuration 
 
 ## 7. Scheduling constraints (important)
 
+### Subject flag `is_lab` (critical)
+
+| `is_lab` | Meaning |
+|----------|---------|
+| **`false`** | **Theory-only** subject: all `credits` are weekly theory periods; mapping needs **`theory_room_id`** pointing to a room with **`room_type: classroom`** only. |
+| **`true`** | **Theory + lab** subject: **not** “lab only”. It has **`credits - 1`** weekly **theory** periods **and** **one** weekly **lab** session (exactly **two contiguous periods**). Mapping needs **`theory_room_id`** (classroom) **and** **`lab_room_id`** (lab). |
+
+### Other rules
+
 | Rule | Description |
 |------|-------------|
-| **Theory once per day** | Same `subject_id` at most **one** slot per weekday per program (grid scan + explicit tracker). |
-| **Theory credits** | `credits` = number of **weekly** theory periods to place (spread across different days when possible). |
-| **Lab block** | Each lab subject: **one** placement of **two adjacent periods** in the week; both periods share the same subject/faculty/room. |
-| **Rooms from mapping** | **No random room pick** in the main pipeline: lab uses mapping’s **lab** room; theory uses mapping’s **classroom** (non-lab) room. |
-| **Faculty conflicts** | Same faculty cannot be double-booked in the same day/period (global across programs when building from one grid pass per program — faculty schedule still reflects stored rows). |
+| **Theory once per day** | Same `subject_id` at most **one theory** slot per weekday per program (lab slots on the same day do **not** block theory that day). |
+| **Theory credits** | See table above: theory-only uses all credits; theory+lab uses `credits - 1` for theory. |
+| **Lab block** | For `is_lab == true`: **one** placement of **two adjacent periods** per week; uses **`lab_room_id`**. |
+| **Rooms from mapping** | No random room pick: theory always uses **`theory_room_id`**; lab uses **`lab_room_id`**. |
+| **Faculty conflicts** | Same faculty cannot be double-booked in the same day/period. |
 | **Room conflicts** | Same room cannot be used twice in the same day/period. |
-| **Mapping scope** | Mappings are **per `program_id`** so subjects in different programs do not share the wrong faculty/room row. |
+| **Mapping scope** | Mappings are **per `program_id`**. |
 
-If a subject has **no mapping**, **missing `room_id`**, or **room type mismatch**, it is **skipped** with a `dev.log` message (generation continues for others).
+If a subject has **no mapping**, **missing required room ids**, or **wrong room types**, it is **skipped** with a `dev.log` message (generation continues for others).
+
+**Legacy mappings** that only have `room_id` (no `theory_room_id`) still work for **theory room** resolution: `theory_room_id` falls back to `room_id`. Combined courses still need **`lab_room_id`** added in Firestore or via the updated Add Mapping screen.
 
 ---
 
@@ -112,7 +133,7 @@ Timetable Configuration screen: save config, prepare data, optional stepwise lab
 
 | Area | Screen |
 |------|--------|
-| Auth | `LoginScreen` |
+| Auth | `LoginScreen` (welcome header, centered sign-in card, Material 3 styling — same card radius/shadow language as admin forms) |
 | Admin | `DashboardScreen`, `OverviewScreen`, `MyTimetablesScreen`, `InstituteDataScreen`, `LectureConfigurationScreen`, `TimetableConfigScreen` |
 | Forms | Add department/program/faculty/subject/**room**/**mapping** |
 | Views | `ViewTimetableScreen`, `FacultyScheduleScreen`, `CalendarScreen` |
@@ -122,10 +143,11 @@ Timetable Configuration screen: save config, prepare data, optional stepwise lab
 ## 10. Current implementation status
 
 - Firebase wiring and **named routes** (including `/my-timetables`, `/calendar`)
-- **Mappings include `room_id`** and optional `department_id`
-- **Add Mapping** UI: Department → Program → Subject → Faculty → Room (room list filtered by subject `is_lab`)
-- **Timetable engine** uses mapping rooms and stricter theory/lab rules as above
-- **UI** resolves IDs to names via batched Firestore reads; `TimetableGrid` supports program vs faculty layout and lab tint
+- **Mappings** store `theory_room_id` + optional `lab_room_id` (+ `room_id` mirror for legacy reads)
+- **Room types**: `RoomTypeUtils` + Add Room persist **`classroom`** / **`lab`**; mapping dropdowns and the scheduler filter on those values only (legacy title-case strings that normalize to the same tokens still work).
+- **Add Mapping** UI: Department → Program → Subject → Faculty → **Theory room** (rooms with `room_type == classroom`) → **Lab room** (only when subject `is_lab` is true; `room_type == lab` only)
+- **Timetable engine** uses the credit split and dual rooms as in §6–7
+- **UI** resolves IDs to names; `TimetableGrid` labels lab slots with **(LAB)** and tints lab rows
 
 ---
 

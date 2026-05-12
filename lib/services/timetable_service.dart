@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'dart:developer' as dev;
+import 'package:timetable_scheduler/utils/room_type_utils.dart';
 
 class TimetableService {
   TimetableService({FirebaseFirestore? firestore})
@@ -164,7 +165,7 @@ class TimetableService {
             .toList(growable: false);
         final facultyMap = (programInfo['facultyMap'] as Map<String, dynamic>? ?? {})
             .map((key, value) => MapEntry(key, value.toString()));
-        final roomMap = (programInfo['roomMap'] as Map<String, dynamic>? ?? {})
+        final labRoomMap = (programInfo['labRoomMap'] as Map<String, dynamic>? ?? {})
             .map((key, value) => MapEntry(key, value.toString()));
 
         final labSubjects = subjects
@@ -182,15 +183,15 @@ class TimetableService {
         for (final subject in labSubjects) {
           final subjectId = (subject['id'] ?? '').toString();
           final facultyId = (facultyMap[subjectId] ?? '').toString();
-          final mappedRoomId = (roomMap[subjectId] ?? '').toString();
-          if (subjectId.isEmpty || facultyId.isEmpty || mappedRoomId.isEmpty) {
+          final mappedLabRoomId = (labRoomMap[subjectId] ?? '').toString();
+          if (subjectId.isEmpty || facultyId.isEmpty || mappedLabRoomId.isEmpty) {
             continue;
           }
           if (scheduledLabSubjectsThisProgram.contains(subjectId)) {
             continue;
           }
-          final roomDoc = roomById[mappedRoomId];
-          if (roomDoc == null || !_isLabRoom(roomDoc)) {
+          final roomDoc = roomById[mappedLabRoomId];
+          if (roomDoc == null || !RoomTypeUtils.isLabRoomDoc(roomDoc)) {
             dev.log(
               'Lab $subjectId skipped: invalid or missing lab room in mapping',
               name: 'TimetableService',
@@ -203,7 +204,7 @@ class TimetableService {
             orderedDays: orderedDays,
             subjectId: subjectId,
             facultyId: facultyId,
-            roomId: mappedRoomId,
+            roomId: mappedLabRoomId,
             facultySchedule: facultySchedule,
             roomSchedule: roomSchedule,
           );
@@ -262,8 +263,8 @@ class TimetableService {
         final facultyMap =
             (programInfo['facultyMap'] as Map<String, dynamic>? ?? {})
                 .map((key, value) => MapEntry(key, value.toString()));
-        final roomMap =
-            (programInfo['roomMap'] as Map<String, dynamic>? ?? {})
+        final theoryRoomMap =
+            (programInfo['theoryRoomMap'] as Map<String, dynamic>? ?? {})
                 .map((key, value) => MapEntry(key, value.toString()));
         final programGrid =
             (timetable[programId] as Map<String, dynamic>? ?? <String, dynamic>{});
@@ -271,29 +272,31 @@ class TimetableService {
           continue;
         }
 
-        final theorySubjects = subjects
-            .where((subject) => subject['is_lab'] != true)
-            .toList(growable: false);
-
         final seenTheoryIds = <String>{};
-        for (final subject in theorySubjects) {
+        for (final subject in subjects) {
           final subjectId = (subject['id'] ?? '').toString().trim();
           if (subjectId.isEmpty || !seenTheoryIds.add(subjectId)) {
             continue;
           }
 
-          final facultyId = (facultyMap[subjectId] ?? '').toString();
-          final mappedRoomId = (roomMap[subjectId] ?? '').toString();
-          final lecturesTarget = (subject['credits'] as num?)?.toInt() ?? 0;
-
-          if (facultyId.isEmpty || mappedRoomId.isEmpty || lecturesTarget <= 0) {
+          final credits = (subject['credits'] as num?)?.toInt() ?? 0;
+          final isLabCourse = subject['is_lab'] == true;
+          final lecturesTarget = _theoryPeriodsPerWeek(credits: credits, isLabCourse: isLabCourse);
+          if (lecturesTarget <= 0) {
             continue;
           }
 
-          final roomDoc = roomById[mappedRoomId];
-          if (roomDoc == null || _isLabRoom(roomDoc)) {
+          final facultyId = (facultyMap[subjectId] ?? '').toString();
+          final mappedTheoryRoomId = (theoryRoomMap[subjectId] ?? '').toString();
+
+          if (facultyId.isEmpty || mappedTheoryRoomId.isEmpty) {
+            continue;
+          }
+
+          final roomDoc = roomById[mappedTheoryRoomId];
+          if (roomDoc == null || !RoomTypeUtils.isClassroomRoomDoc(roomDoc)) {
             dev.log(
-              'Theory $subjectId skipped: classroom missing or mapped room is a lab',
+              'Theory $subjectId skipped: classroom missing or mapped theory room is not classroom',
               name: 'TimetableService',
             );
             continue;
@@ -307,7 +310,7 @@ class TimetableService {
               orderedDays: orderedDays,
               subjectId: subjectId,
               facultyId: facultyId,
-              roomId: mappedRoomId,
+              roomId: mappedTheoryRoomId,
               facultySchedule: facultySchedule,
               roomSchedule: roomSchedule,
               theoryPlacedTracker: theoryPlacedTracker,
@@ -440,10 +443,11 @@ class TimetableService {
         }
 
         final facultyMap = <String, String>{};
-        final roomMap = <String, String>{};
+        final theoryRoomMap = <String, String>{};
+        final labRoomMap = <String, String>{};
 
         for (final subject in subjects) {
-          final subjectId = (subject['id'] ?? '').toString();
+          final subjectId = (subject['id'] ?? '').toString().trim();
           if (subjectId.isEmpty) {
             continue;
           }
@@ -462,51 +466,65 @@ class TimetableService {
           }
 
           final facultyId = (row['faculty_id'] ?? '').toString().trim();
-          final roomId = (row['room_id'] ?? '').toString().trim();
-          if (facultyId.isEmpty || roomId.isEmpty) {
+          if (facultyId.isEmpty) {
             dev.log(
-              'Skipping subject $subjectId: mapping missing faculty or room',
+              'Skipping subject $subjectId: mapping missing faculty',
               name: 'TimetableService',
             );
             continue;
           }
 
-          final roomDoc = roomById[roomId];
-          if (roomDoc == null) {
+          final isLabCourse = subject['is_lab'] == true;
+          final theoryRoomId = (row['theory_room_id'] ?? row['room_id'] ?? '')
+              .toString()
+              .trim();
+          final labRoomId = (row['lab_room_id'] ?? '').toString().trim();
+
+          if (theoryRoomId.isEmpty) {
             dev.log(
-              'Skipping subject $subjectId: room $roomId not found',
+              'Skipping subject $subjectId: mapping missing theory_room_id (or legacy room_id)',
               name: 'TimetableService',
             );
             continue;
           }
 
-          final isLabSubject = subject['is_lab'] == true;
-          if (isLabSubject) {
-            if (!_isLabRoom(roomDoc)) {
+          final theoryRoomDoc = roomById[theoryRoomId];
+          if (theoryRoomDoc == null || !RoomTypeUtils.isClassroomRoomDoc(theoryRoomDoc)) {
+            dev.log(
+              'Skipping subject $subjectId: theory room missing or not a classroom',
+              name: 'TimetableService',
+            );
+            continue;
+          }
+
+          if (isLabCourse) {
+            if (labRoomId.isEmpty) {
               dev.log(
-                'Skipping lab subject $subjectId: mapped room is not a lab room',
+                'Skipping subject $subjectId: is_lab subject requires lab_room_id in mapping',
                 name: 'TimetableService',
               );
               continue;
             }
-          } else {
-            if (_isLabRoom(roomDoc)) {
+            final labRoomDoc = roomById[labRoomId];
+            if (labRoomDoc == null || !RoomTypeUtils.isLabRoomDoc(labRoomDoc)) {
               dev.log(
-                'Skipping theory subject $subjectId: mapped room is a lab room',
+                'Skipping subject $subjectId: lab room missing or not a lab room',
                 name: 'TimetableService',
               );
               continue;
             }
+            labRoomMap[subjectId] = labRoomId;
           }
 
           facultyMap[subjectId] = facultyId;
-          roomMap[subjectId] = roomId;
+          theoryRoomMap[subjectId] = theoryRoomId;
         }
 
         timetableData[programId] = {
           'subjects': subjects,
           'facultyMap': facultyMap,
-          'roomMap': roomMap,
+          'theoryRoomMap': theoryRoomMap,
+          'labRoomMap': labRoomMap,
         };
       }
 
@@ -903,9 +921,11 @@ class TimetableService {
       final data = entry.value as Map<String, dynamic>? ?? {};
       final subjects = (data['subjects'] as List<dynamic>? ?? []);
       final facultyMap = (data['facultyMap'] as Map<String, dynamic>? ?? {});
-      final roomMap = (data['roomMap'] as Map<String, dynamic>? ?? {});
+      final theoryRoomMap =
+          (data['theoryRoomMap'] as Map<String, dynamic>? ?? {});
+      final labRoomMap = (data['labRoomMap'] as Map<String, dynamic>? ?? {});
       dev.log(
-        'Program ${entry.key} -> subjects: ${subjects.length}, faculty+room maps: ${facultyMap.length} / ${roomMap.length}',
+        'Program ${entry.key} -> subjects: ${subjects.length}, maps faculty=${facultyMap.length} theoryR=${theoryRoomMap.length} labR=${labRoomMap.length}',
         name: 'TimetableService',
       );
     }
@@ -936,9 +956,16 @@ class TimetableService {
     dev.log('-------------------------------', name: 'TimetableService');
   }
 
-  bool _isLabRoom(Map<String, dynamic> room) {
-    final type = (room['room_type'] ?? room['type'] ?? '').toString().toLowerCase();
-    return type.contains('lab');
+  /// Weekly theory periods: all credits when not a lab course; when `is_lab`
+  /// is true, one credit is reserved for the single 2-period lab block.
+  int _theoryPeriodsPerWeek({required int credits, required bool isLabCourse}) {
+    if (credits <= 0) {
+      return 0;
+    }
+    if (!isLabCourse) {
+      return credits;
+    }
+    return credits - 1;
   }
 
   bool _tryPlaceLabForProgram({
@@ -1135,11 +1162,16 @@ class TimetableService {
   bool _subjectAlreadyPlacedInDay(List<dynamic> slots, String subjectId) {
     final target = subjectId.trim();
     for (final slot in slots) {
-      if (slot is Map<String, dynamic>) {
-        final sid = (slot['subject_id'] ?? '').toString().trim();
-        if (sid == target) {
-          return true;
-        }
+      if (slot is! Map<String, dynamic>) {
+        continue;
+      }
+      final slotType = (slot['type'] ?? 'theory').toString().toLowerCase();
+      if (slotType == 'lab') {
+        continue;
+      }
+      final sid = (slot['subject_id'] ?? '').toString().trim();
+      if (sid == target) {
+        return true;
       }
     }
     return false;

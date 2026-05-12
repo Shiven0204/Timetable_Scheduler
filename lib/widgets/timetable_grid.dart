@@ -82,7 +82,7 @@ class TimetableGrid extends StatelessWidget {
       return _emptySlot(context);
     }
 
-    final subject = (slot['subject'] ?? '').toString().trim();
+    final subjectRaw = (slot['subject'] ?? '').toString().trim();
     final line2 = mode == TimetableGridMode.facultyView
         ? (slot['program'] ?? '').toString().trim()
         : (slot['faculty'] ?? '').toString().trim();
@@ -90,7 +90,9 @@ class TimetableGrid extends StatelessWidget {
     final isLab = highlightLabSlots &&
         (slot['type'] ?? '').toString().toLowerCase() == 'lab';
 
-    if (subject.isEmpty && line2.isEmpty && room.isEmpty) {
+    final subject = subjectRaw.isNotEmpty && isLab ? '$subjectRaw (LAB)' : subjectRaw;
+
+    if (subjectRaw.isEmpty && line2.isEmpty && room.isEmpty) {
       return _emptySlot(context);
     }
 

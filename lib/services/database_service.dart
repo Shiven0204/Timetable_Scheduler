@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:timetable_scheduler/utils/room_type_utils.dart';
 
 class DatabaseService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -101,11 +102,14 @@ class DatabaseService {
     }
   }
 
+  /// [theoryRoomId] = classroom for all theory periods. [labRoomId] required when
+  /// the subject has both theory and lab (`is_lab` on subject document).
   Future<void> saveMapping({
     required String facultyId,
     required String subjectId,
     required String programId,
-    required String roomId,
+    required String theoryRoomId,
+    String? labRoomId,
     String? departmentId,
   }) async {
     try {
@@ -113,9 +117,13 @@ class DatabaseService {
         'faculty_id': facultyId,
         'subject_id': subjectId,
         'program_id': programId,
-        'room_id': roomId,
+        'theory_room_id': theoryRoomId,
+        'room_id': theoryRoomId,
         'created_at': FieldValue.serverTimestamp(),
       };
+      if (labRoomId != null && labRoomId.trim().isNotEmpty) {
+        data['lab_room_id'] = labRoomId.trim();
+      }
       if (departmentId != null && departmentId.trim().isNotEmpty) {
         data['department_id'] = departmentId.trim();
       }
@@ -140,7 +148,7 @@ class DatabaseService {
 
       await _db.collection('Rooms').add({
         'room_name': roomName,
-        'room_type': roomType,
+        'room_type': RoomTypeUtils.normalizeForFirestore(roomType),
         'capacity': capacity,
         'created_at': FieldValue.serverTimestamp(),
       });

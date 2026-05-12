@@ -1,8 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:timetable_scheduler/services/database_service.dart';
+import 'package:timetable_scheduler/utils/room_type_utils.dart';
 
-/// Maps subject + faculty + program to a specific [room_id] (lab vs classroom).
+/// Maps each subject (per program) to faculty + **theory** room (`room_type: classroom`) + optional **lab** room (`room_type: lab`).
+///
+/// When `is_lab` is true on the subject, it means **theory + one weekly lab block** (not lab-only):
+/// pick a classroom for theory and a lab room for the 2-period lab session.
 class AddMappingScreen extends StatefulWidget {
   const AddMappingScreen({super.key});
 
@@ -17,7 +21,8 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
   String? _selectedProgramId;
   String? _selectedSubjectId;
   String? _selectedFacultyId;
-  String? _selectedRoomId;
+  String? _selectedTheoryRoomId;
+  String? _selectedLabRoomId;
 
   List<Map<String, dynamic>> _departments = [];
   List<Map<String, dynamic>> _programs = [];
@@ -93,7 +98,7 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
           return {
             'id': doc.id,
             'name': d['room_name'] ?? doc.id,
-            'room_type': (d['room_type'] ?? '').toString(),
+            'room_type': (d['room_type'] ?? d['type'] ?? '').toString(),
           };
         }).toList();
       });
@@ -151,18 +156,19 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
         .toList();
   }
 
-  bool _isLabRoomType(String roomType) {
-    return roomType.toLowerCase().contains('lab');
+  /// Theory slots: only rooms with canonical `classroom` type.
+  List<Map<String, dynamic>> get _classroomRooms {
+    return _rooms.where((r) {
+      final t = r['room_type'] ?? r['type'];
+      return RoomTypeUtils.isClassroom(t);
+    }).toList();
   }
 
-  List<Map<String, dynamic>> get _roomsForSelectedSubject {
-    final sub = _currentSubject;
-    if (sub == null) return [];
-    final isLab = sub['is_lab'] == true;
+  /// Lab slots: only rooms with canonical `lab` type.
+  List<Map<String, dynamic>> get _labRoomsOnly {
     return _rooms.where((r) {
-      final t = (r['room_type'] ?? '').toString();
-      final lab = _isLabRoomType(t);
-      return isLab ? lab : !lab;
+      final t = r['room_type'] ?? r['type'];
+      return RoomTypeUtils.isLab(t);
     }).toList();
   }
 
@@ -172,7 +178,8 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
       _selectedProgramId = null;
       _selectedSubjectId = null;
       _selectedFacultyId = null;
-      _selectedRoomId = null;
+      _selectedTheoryRoomId = null;
+      _selectedLabRoomId = null;
     });
   }
 
@@ -181,14 +188,16 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
       _selectedProgramId = id;
       _selectedSubjectId = null;
       _selectedFacultyId = null;
-      _selectedRoomId = null;
+      _selectedTheoryRoomId = null;
+      _selectedLabRoomId = null;
     });
   }
 
   void _onSubjectChanged(String? id) {
     setState(() {
       _selectedSubjectId = id;
-      _selectedRoomId = null;
+      _selectedTheoryRoomId = null;
+      _selectedLabRoomId = null;
     });
   }
 
@@ -197,18 +206,50 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
         _selectedProgramId == null ||
         _selectedSubjectId == null ||
         _selectedFacultyId == null ||
-        _selectedRoomId == null) {
+        _selectedTheoryRoomId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Select department, program, subject, faculty, and room')),
+        const SnackBar(
+          content: Text(
+            'Select department, program, subject, faculty, and theory room',
+          ),
+        ),
       );
       return;
     }
 
-    final roomsPick = _roomsForSelectedSubject;
-    if (roomsPick.isEmpty) {
+    final sub = _currentSubject;
+    final isLabCourse = sub?['is_lab'] == true;
+
+    if (isLabCourse) {
+      if (_selectedLabRoomId == null || _selectedLabRoomId!.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'This subject includes a lab: select a lab room as well.',
+            ),
+          ),
+        );
+        return;
+      }
+    }
+
+    if (_classroomRooms.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No suitable room for this subject type. Add a Lab or Classroom room.'),
+          content: Text(
+            'Add at least one room with room type classroom first.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    if (isLabCourse && _labRoomsOnly.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Add at least one room with room type lab for theory+lab subjects.',
+          ),
         ),
       );
       return;
@@ -222,7 +263,8 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
         facultyId: _selectedFacultyId!,
         subjectId: _selectedSubjectId!,
         programId: _selectedProgramId!,
-        roomId: _selectedRoomId!,
+        theoryRoomId: _selectedTheoryRoomId!,
+        labRoomId: isLabCourse ? _selectedLabRoomId : null,
         departmentId: deptId.isNotEmpty ? deptId : null,
       );
 
@@ -235,7 +277,8 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
       setState(() {
         _selectedSubjectId = null;
         _selectedFacultyId = null;
-        _selectedRoomId = null;
+        _selectedTheoryRoomId = null;
+        _selectedLabRoomId = null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -298,11 +341,10 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
       );
     }
 
-    final roomItems = _roomsForSelectedSubject;
     final sub = _currentSubject;
-    final roomHint = sub == null
-        ? ''
-        : (sub['is_lab'] == true ? 'Lab rooms only' : 'Classroom-type rooms only');
+    final isLabCourse = sub?['is_lab'] == true;
+    final theoryItems = _classroomRooms;
+    final labItems = _labRoomsOnly;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Add Mapping')),
@@ -327,13 +369,15 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
-                  'Subject → Faculty → Room (per program)',
+                  'Faculty + rooms (per program)',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Order: Department → Program → Subject → Faculty → Room',
+                  isLabCourse
+                      ? 'This subject has theory lectures and one weekly lab block. Pick a classroom and a lab room.'
+                      : 'Theory-only subject: pick a classroom.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
@@ -376,25 +420,25 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
                   enabled: _selectedProgramId != null,
                 ),
                 const SizedBox(height: 16),
-                if (roomHint.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Text(
-                      roomHint,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ),
                 _buildDropdown(
-                  label: 'Room',
-                  value: _selectedRoomId,
-                  items: roomItems,
+                  label: 'Theory room (classroom)',
+                  value: _selectedTheoryRoomId,
+                  items: theoryItems,
                   displayKey: 'name',
-                  onChanged: (val) => setState(() => _selectedRoomId = val),
-                  enabled: _selectedSubjectId != null && roomItems.isNotEmpty,
+                  onChanged: (val) => setState(() => _selectedTheoryRoomId = val),
+                  enabled: _selectedSubjectId != null && theoryItems.isNotEmpty,
                 ),
+                if (isLabCourse) ...[
+                  const SizedBox(height: 16),
+                  _buildDropdown(
+                    label: 'Lab room',
+                    value: _selectedLabRoomId,
+                    items: labItems,
+                    displayKey: 'name',
+                    onChanged: (val) => setState(() => _selectedLabRoomId = val),
+                    enabled: _selectedSubjectId != null && labItems.isNotEmpty,
+                  ),
+                ],
                 const SizedBox(height: 24),
                 SizedBox(
                   width: double.infinity,

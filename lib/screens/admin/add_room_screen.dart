@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:timetable_scheduler/services/database_service.dart';
+import 'package:timetable_scheduler/utils/room_type_utils.dart';
 
 class AddRoomScreen extends StatefulWidget {
   const AddRoomScreen({super.key});
@@ -10,7 +11,10 @@ class AddRoomScreen extends StatefulWidget {
 
 class _AddRoomScreenState extends State<AddRoomScreen> {
 
-  static const _roomTypes = ['Classroom', 'Lab'];
+  static const Map<String, String> _roomTypeLabels = {
+    RoomTypeUtils.classroom: 'Classroom',
+    RoomTypeUtils.lab: 'Lab',
+  };
 
   final _roomNameController = TextEditingController();
   final _capacityController = TextEditingController();
@@ -140,10 +144,10 @@ class _AddRoomScreenState extends State<AddRoomScreen> {
                       isExpanded: true,
                       value: _roomType,
                       hint: const Text('Select room type'),
-                      items: _roomTypes.map((t) {
+                      items: _roomTypeLabels.entries.map((e) {
                         return DropdownMenuItem<String>(
-                          value: t,
-                          child: Text(t),
+                          value: e.key,
+                          child: Text(e.value),
                         );
                       }).toList(),
                       onChanged: (value) {
