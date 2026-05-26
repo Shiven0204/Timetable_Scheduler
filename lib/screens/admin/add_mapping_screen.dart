@@ -68,8 +68,8 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
           final d = doc.data();
           return {
             'id': doc.id,
-            'program_name': d['program_name'] ?? '',
-            'branch_name': d['branch_name'] ?? '',
+            'program_name': d['program_name'] ?? d['name'] ?? '',
+            'branch_name': d['branch_name'] ?? d['short_name'] ?? '',
             'department_id': (d['department_id'] ?? '').toString(),
           };
         }).toList();
@@ -88,7 +88,7 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
           final d = doc.data();
           return {
             'id': doc.id,
-            'name': d['faculty_name'] ?? doc.id,
+            'name': d['faculty_name'] ?? d['full_name'] ?? doc.id,
             'department_id': (d['department_id'] ?? '').toString(),
           };
         }).toList();
@@ -97,7 +97,7 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
           final d = doc.data();
           return {
             'id': doc.id,
-            'name': d['room_name'] ?? doc.id,
+            'name': d['room_name'] ?? d['name'] ?? doc.id,
             'room_type': (d['room_type'] ?? d['type'] ?? '').toString(),
           };
         }).toList();

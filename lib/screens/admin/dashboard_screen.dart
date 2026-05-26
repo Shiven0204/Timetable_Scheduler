@@ -133,45 +133,6 @@ class _AdminDashboardCards extends StatelessWidget {
             ),
           ],
         ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _QuickActionCard(
-                title: 'Overview',
-                subtitle: 'Data input & system overview',
-                icon: Icons.storage,
-                gradient: LinearGradient(
-                  colors: [
-                    scheme.primaryContainer,
-                    Color.lerp(scheme.primary, scheme.tertiary, 0.4)!,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                onTap: () => Navigator.pushNamed(context, AppRoutes.overview),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _QuickActionCard(
-                title: 'Generate Timetable',
-                subtitle: 'Configure & run scheduling engine',
-                icon: Icons.auto_fix_high,
-                gradient: LinearGradient(
-                  colors: [
-                    scheme.secondary,
-                    Color.lerp(scheme.secondary, scheme.primary, 0.35)!,
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                onTap: () =>
-                    Navigator.pushNamed(context, AppRoutes.timetableConfig),
-              ),
-            ),
-          ],
-        ),
       ],
     );
   }

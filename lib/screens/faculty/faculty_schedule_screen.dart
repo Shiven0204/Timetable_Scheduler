@@ -236,7 +236,9 @@ class _FacultyScheduleScreenState extends State<FacultyScheduleScreen> {
                         (faculty) => DropdownMenuItem<String>(
                           value: faculty['id'] as String,
                           child: Text(
-                            (faculty['faculty_name'] ?? faculty['id'])
+                            (faculty['faculty_name'] ??
+                                    faculty['full_name'] ??
+                                    faculty['id'])
                                 .toString(),
                             overflow: TextOverflow.ellipsis,
                           ),

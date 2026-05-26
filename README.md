@@ -73,10 +73,10 @@ Firestore **security rules** should allow authenticated users to read their own 
 | Collection | Purpose |
 |------------|---------|
 | `Department` | Departments (`dept_name`) |
-| `Programs` | Programs (`program_name`, `branch_name`, `department_id`) |
-| `Faculty` | Faculty (`faculty_name`, `department_id`, …) |
+| `Programs` | Programs (`name`, `short_name`, optional `student_count`; legacy mirrors: `program_name`, `branch_name`) |
+| `Faculty` | Faculty (`full_name`, `short_name`, `max_lectures_per_day`, `availability`, optional `email` / `role` / `phone` / `designation`; legacy mirror: `faculty_name`) |
 | `Subjects` | Subjects (`subject_name`, `program_id`, `credits`, **`is_lab`**) — see §8 for meaning of `is_lab` |
-| `Rooms` | Rooms (`room_name`, **`room_type`**: canonical **`classroom`** or **`lab`** (lowercase in Firestore; UI may show title case), `capacity`) |
+| `Rooms` | Rooms (`name`, optional `building_name`, `capacity`, **`room_type`** canonical **`classroom`** / **`lab`**; legacy mirror: `room_name`) |
 | `Mappings` | Per program: `subject_id`, `faculty_id`, **`theory_room_id`**, optional **`lab_room_id`** (required when subject `is_lab` is true), legacy **`room_id`** (mirrors `theory_room_id` on save), optional `department_id`, `created_at` |
 | `timetable_config` / `basic_information` | Full bell-schedule payload: `timetable_name`, `description`, `academic_session`, `schedule_type`, `cycle_weeks`, `schedule_mode`, `working_days`, `periods`, `breaks`, `day_schedules` |
 | `config` / `timetable` doc | Engine fields synced from Basic Information: `working_days_per_week`, `periods_per_day`, `timetable_name`, … |
@@ -98,6 +98,25 @@ Administrators open **Overview → Basic Information** as the **first configurat
 | **Periods & breaks** | Dynamic list with name + start/end time pickers; add/remove rows |
 
 On **Save**, data is stored at `timetable_config/basic_information` and key engine fields are merged into `config/timetable` so existing `TimetableService.getConfig()` continues to work.
+
+### Institute Data module updates
+
+- **Dashboard cleanup**: Admin dashboard quick actions now keep only **My Timetables** and **View Calendar**.
+- **Institute Data cleanup**: Subject entry is temporarily removed from Institute Data shortcuts; module still exists and is reachable from its route.
+- **Faculty form**:
+  - Required: `full_name`, `short_name`, `max_lectures_per_day`, `availability`
+  - Optional (collapsed section): `email`, `role`, `phone`, `designation`, `department_id`
+  - `short_name` auto-generates from full name and remains editable.
+- **Program form**:
+  - Required: `name`, `short_name`
+  - Optional: `student_count`
+  - `short_name` auto-generates and remains editable.
+- **Room form**:
+  - Required: `name`, `room_type`, `capacity`
+  - Optional: `building_name`
+  - `room_type` is persisted as lowercase canonical values (`classroom`, `lab`).
+- **Compatibility**:
+  - Write path keeps legacy mirrors (`program_name`, `branch_name`, `faculty_name`, `room_name`) so current timetable/mapping/read flows remain stable.
 
 ### Room type system (`classroom` vs `lab`)
 

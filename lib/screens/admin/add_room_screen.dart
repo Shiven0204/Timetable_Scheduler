@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:timetable_scheduler/services/database_service.dart';
 import 'package:timetable_scheduler/utils/room_type_utils.dart';
+import 'package:timetable_scheduler/widgets/institute_form_card.dart';
 
 class AddRoomScreen extends StatefulWidget {
   const AddRoomScreen({super.key});
@@ -10,174 +12,138 @@ class AddRoomScreen extends StatefulWidget {
 }
 
 class _AddRoomScreenState extends State<AddRoomScreen> {
-
   static const Map<String, String> _roomTypeLabels = {
     RoomTypeUtils.classroom: 'Classroom',
     RoomTypeUtils.lab: 'Lab',
   };
 
-  final _roomNameController = TextEditingController();
+  final _nameController = TextEditingController();
+  final _buildingController = TextEditingController();
   final _capacityController = TextEditingController();
 
   final DatabaseService _dbService = DatabaseService();
 
   String? _roomType;
+  bool _saving = false;
 
   @override
   void dispose() {
-    _roomNameController.dispose();
+    _nameController.dispose();
+    _buildingController.dispose();
     _capacityController.dispose();
     super.dispose();
   }
 
-  void _onSave() async {
-
-    final roomName = _roomNameController.text.trim();
+  Future<void> _onSave() async {
+    final name = _nameController.text.trim();
+    final building = _buildingController.text.trim();
     final capacityText = _capacityController.text.trim();
 
-    if (roomName.isEmpty ||
-        capacityText.isEmpty ||
-        _roomType == null) {
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Fill all fields')),
-      );
+    if (name.isEmpty) {
+      _showSnack('Room name is required');
+      return;
+    }
+    if (_roomType == null) {
+      _showSnack('Select a room type');
       return;
     }
 
-    int? capacity = int.tryParse(capacityText);
-
-    if (capacity == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter valid capacity')),
-      );
+    final capacity = int.tryParse(capacityText);
+    if (capacity == null || capacity <= 0) {
+      _showSnack('Enter a valid capacity (greater than 0)');
       return;
     }
 
+    setState(() => _saving = true);
     try {
-
       await _dbService.saveRoom(
-        roomName: roomName,
+        name: name,
         roomType: _roomType!,
         capacity: capacity,
+        buildingName: building.isEmpty ? null : building,
       );
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Room saved successfully')),
-      );
-
-      _roomNameController.clear();
+      _showSnack('Room saved successfully');
+      _nameController.clear();
+      _buildingController.clear();
       _capacityController.clear();
-
-      setState(() {
-        _roomType = null;
-      });
-
+      setState(() => _roomType = null);
     } catch (e) {
       if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      _showSnack('Error: $e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
-  InputDecoration _decoration(String label) {
-    return InputDecoration(
-      labelText: label,
-      border: const OutlineInputBorder(),
-    );
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Add Room'),
-      ),
+      appBar: AppBar(title: const Text('Add Room')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        child: Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-
-                const Text(
-                  'Room Details',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+        child: InstituteFormCard(
+          title: 'Room details',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _nameController,
+                decoration: instituteInputDecoration('Room Name *'),
+              ),
+              const SizedBox(height: 16),
+              InputDecorator(
+                decoration: instituteInputDecoration('Room Type *'),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: _roomType,
+                    hint: const Text('Select room type'),
+                    items: _roomTypeLabels.entries.map((e) {
+                      return DropdownMenuItem<String>(
+                        value: e.key,
+                        child: Text(e.value),
+                      );
+                    }).toList(),
+                    onChanged: (value) => setState(() => _roomType = value),
                   ),
                 ),
-
-                const SizedBox(height: 16),
-
-                TextField(
-                  controller: _roomNameController,
-                  decoration: _decoration('Room Name'),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _buildingController,
+                textCapitalization: TextCapitalization.words,
+                decoration: instituteInputDecoration(
+                  'Building name',
+                  hint: 'e.g. Block A',
                 ),
-
-                const SizedBox(height: 16),
-
-                InputDecorator(
-                  decoration: _decoration('Room Type'),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      isExpanded: true,
-                      value: _roomType,
-                      hint: const Text('Select room type'),
-                      items: _roomTypeLabels.entries.map((e) {
-                        return DropdownMenuItem<String>(
-                          value: e.key,
-                          child: Text(e.value),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _roomType = value;
-                        });
-                      },
-                    ),
-                  ),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _capacityController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: instituteInputDecoration('Capacity *'),
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                height: 48,
+                child: FilledButton(
+                  onPressed: _saving ? null : _onSave,
+                  child: _saving
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Save room'),
                 ),
-
-                const SizedBox(height: 16),
-
-                TextField(
-                  controller: _capacityController,
-                  keyboardType: TextInputType.number,
-                  decoration: _decoration('Capacity'),
-                ),
-
-                const SizedBox(height: 24),
-
-                SizedBox(
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: _onSave,
-                    child: const Text('Save'),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

@@ -1,6 +1,9 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:timetable_scheduler/services/database_service.dart';
+import 'package:timetable_scheduler/utils/short_name_generator.dart';
+import 'package:timetable_scheduler/widgets/institute_form_card.dart';
 
 class AddFacultyScreen extends StatefulWidget {
   const AddFacultyScreen({super.key});
@@ -10,189 +13,302 @@ class AddFacultyScreen extends StatefulWidget {
 }
 
 class _AddFacultyScreenState extends State<AddFacultyScreen> {
-  final _nameController = TextEditingController();
+  final _fullNameController = TextEditingController();
+  final _shortNameController = TextEditingController();
+  final _maxLecturesController = TextEditingController(text: '4');
   final _emailController = TextEditingController();
-  final _expertiseController = TextEditingController();
-  final _maxLecturesController = TextEditingController();
+  final _roleController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _designationController = TextEditingController();
 
   final DatabaseService _dbService = DatabaseService();
 
+  static const _availabilityOptions = {
+    'first_half': 'First Half',
+    'second_half': 'Second Half',
+    'both': 'Both',
+  };
+
+  String _availability = 'both';
+  bool _shortNameEdited = false;
+  bool _additionalExpanded = false;
   String? _selectedDepartmentId;
   List<Map<String, dynamic>> _departments = [];
+  bool _saving = false;
 
   @override
   void initState() {
     super.initState();
+    _fullNameController.addListener(_onFullNameChanged);
     _loadDepartments();
   }
 
   Future<void> _loadDepartments() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('Department')
-        .get();
-
+    final snapshot =
+        await FirebaseFirestore.instance.collection('Department').get();
     if (!mounted) return;
     setState(() {
-      _departments = snapshot.docs.map((doc) {
-        return {'id': doc.id, 'name': doc['dept_name']};
-      }).toList();
+      _departments = snapshot.docs
+          .map((doc) => {'id': doc.id, 'name': doc['dept_name'] ?? doc.id})
+          .toList();
     });
   }
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _expertiseController.dispose();
-    _maxLecturesController.dispose();
-    super.dispose();
-  }
-
-  void _onSave() async {
-    final name = _nameController.text.trim();
-    final email = _emailController.text.trim();
-    final expertiseText = _expertiseController.text.trim();
-    final maxLecturesText = _maxLecturesController.text.trim();
-
-    if (name.isEmpty ||
-        email.isEmpty ||
-        expertiseText.isEmpty ||
-        maxLecturesText.isEmpty ||
-        _selectedDepartmentId == null) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Fill all fields')));
-      return;
-    }
-
-    try {
-      List<String> expertiseList = expertiseText
-          .split(',')
-          .map((e) => e.trim())
-          .toList();
-
-      int maxLectures = int.tryParse(maxLecturesText) ?? 0;
-
-      await _dbService.saveFaculty(
-        facultyName: name,
-        email: email,
-        expertise: expertiseList,
-        maxLecturesPerDay: maxLectures,
-        departmentId: _selectedDepartmentId!,
-      );
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Faculty saved')));
-
-      _nameController.clear();
-      _emailController.clear();
-      _expertiseController.clear();
-      _maxLecturesController.clear();
-
-      setState(() {
-        _selectedDepartmentId = null;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error: $e')));
-    }
-  }
-
-  InputDecoration _decoration(String label) {
-    return InputDecoration(
-      labelText: label,
-      border: const OutlineInputBorder(),
+  void _onFullNameChanged() {
+    if (_shortNameEdited) return;
+    final generated = ShortNameGenerator.generate(_fullNameController.text);
+    _shortNameController.value = TextEditingValue(
+      text: generated,
+      selection: TextSelection.collapsed(offset: generated.length),
     );
   }
 
   @override
+  void dispose() {
+    _fullNameController.removeListener(_onFullNameChanged);
+    _fullNameController.dispose();
+    _shortNameController.dispose();
+    _maxLecturesController.dispose();
+    _emailController.dispose();
+    _roleController.dispose();
+    _phoneController.dispose();
+    _designationController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _onSave() async {
+    final fullName = _fullNameController.text.trim();
+    final shortName = _shortNameController.text.trim().toUpperCase();
+    final maxText = _maxLecturesController.text.trim();
+
+    if (fullName.isEmpty) {
+      _showSnack('Full name is required');
+      return;
+    }
+    if (shortName.isEmpty) {
+      _showSnack('Short name is required');
+      return;
+    }
+
+    final maxLectures = int.tryParse(maxText);
+    if (maxLectures == null || maxLectures <= 0) {
+      _showSnack('Enter a valid max lectures per day (greater than 0)');
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      await _dbService.saveFaculty(
+        fullName: fullName,
+        shortName: shortName,
+        maxLecturesPerDay: maxLectures,
+        availability: _availability,
+        email: _emailController.text.trim(),
+        role: _roleController.text.trim(),
+        phone: _phoneController.text.trim(),
+        designation: _designationController.text.trim(),
+        departmentId: _selectedDepartmentId,
+      );
+      if (!mounted) return;
+      _showSnack('Faculty saved');
+      _clearForm();
+    } catch (e) {
+      if (!mounted) return;
+      _showSnack('Error: $e');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  void _clearForm() {
+    _fullNameController.clear();
+    _shortNameController.clear();
+    _maxLecturesController.text = '4';
+    _emailController.clear();
+    _roleController.clear();
+    _phoneController.clear();
+    _designationController.clear();
+    setState(() {
+      _shortNameEdited = false;
+      _availability = 'both';
+      _selectedDepartmentId = null;
+      _additionalExpanded = false;
+    });
+  }
+
+  void _showSnack(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(title: const Text('Add Faculty')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
-        child: Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-          child: Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text(
-                  'Faculty Details',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _nameController,
-                  decoration: _decoration('Faculty Name'),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: _decoration('Email'),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _expertiseController,
-                  decoration: _decoration('Expertise (comma separated)'),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _maxLecturesController,
-                  keyboardType: TextInputType.number,
-                  decoration: _decoration('Max Lectures Per Day'),
-                ),
-                const SizedBox(height: 16),
-                InputDecorator(
-                  decoration: _decoration('Department'),
-                  child: DropdownButtonHideUnderline(
-                    child: DropdownButton<String>(
-                      isExpanded: true,
-                      value: _selectedDepartmentId,
-                      hint: const Text('Select department'),
-                      items: _departments.map<DropdownMenuItem<String>>((d) {
-                        return DropdownMenuItem<String>(
-                          value: d['id'],
-                          child: Text(d['name']),
-                        );
-                      }).toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _selectedDepartmentId = value;
-                        });
-                      },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            InstituteFormCard(
+              title: 'Main details',
+              subtitle: 'Workload and availability',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _fullNameController,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: instituteInputDecoration('Full Name *'),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _shortNameController,
+                    textCapitalization: TextCapitalization.characters,
+                    onChanged: (_) => _shortNameEdited = true,
+                    decoration: instituteInputDecoration(
+                      'Short Name *',
+                      hint: 'Auto-generated, editable',
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: _onSave,
-                    child: const Text('Save'),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Max lecture configuration',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: scheme.onSurface,
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _maxLecturesController,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                    decoration: instituteInputDecoration(
+                      'Max lectures per day *',
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Preferred availability',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: _availabilityOptions.entries.map((entry) {
+                      final selected = _availability == entry.key;
+                      return ChoiceChip(
+                        label: Text(entry.value),
+                        selected: selected,
+                        onSelected: (_) {
+                          setState(() => _availability = entry.key);
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+              ),
             ),
-          ),
+            const SizedBox(height: 16),
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  initiallyExpanded: _additionalExpanded,
+                  onExpansionChanged: (v) =>
+                      setState(() => _additionalExpanded = v),
+                  title: const Text(
+                    'Additional details',
+                    style: TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: const Text(
+                    'Optional — email, role, phone, designation',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      child: Column(
+                        children: [
+                          TextField(
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            decoration: instituteInputDecoration('Email'),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _roleController,
+                            decoration: instituteInputDecoration(
+                              'Role',
+                              hint: 'e.g. Professor',
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _phoneController,
+                            keyboardType: TextInputType.phone,
+                            decoration: instituteInputDecoration('Phone number'),
+                          ),
+                          const SizedBox(height: 12),
+                          TextField(
+                            controller: _designationController,
+                            decoration: instituteInputDecoration('Designation'),
+                          ),
+                          if (_departments.isNotEmpty) ...[
+                            const SizedBox(height: 12),
+                            InputDecorator(
+                              decoration: instituteInputDecoration(
+                                'Department (optional)',
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  isExpanded: true,
+                                  value: _selectedDepartmentId,
+                                  hint: const Text('None'),
+                                  items: _departments.map((d) {
+                                    return DropdownMenuItem<String>(
+                                      value: d['id'] as String,
+                                      child: Text(d['name'].toString()),
+                                    );
+                                  }).toList(),
+                                  onChanged: (value) {
+                                    setState(() => _selectedDepartmentId = value);
+                                  },
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              height: 48,
+              child: FilledButton(
+                onPressed: _saving ? null : _onSave,
+                child: _saving
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('Save faculty'),
+              ),
+            ),
+          ],
         ),
       ),
     );

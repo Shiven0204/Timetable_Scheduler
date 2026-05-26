@@ -37,8 +37,8 @@ class _AddSubjectScreenState extends State<AddSubjectScreen> {
       _programs = snapshot.docs.map((doc) {
         return {
           'id': doc.id,
-          'program_name': doc['program_name'],
-          'branch_name': doc['branch_name'],
+          'program_name': doc['program_name'] ?? doc['name'],
+          'branch_name': doc['branch_name'] ?? doc['short_name'],
         };
       }).toList();
     });

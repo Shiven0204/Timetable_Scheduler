@@ -34,8 +34,6 @@ class InstituteDataScreen extends StatelessWidget {
               const SizedBox(height: 14),
               _tile(context, 'Faculty', Icons.person, AppRoutes.addFaculty),
               const SizedBox(height: 14),
-              _tile(context, 'Subject', Icons.menu_book, AppRoutes.addSubject),
-              const SizedBox(height: 14),
               _tile(context, 'Room', Icons.meeting_room, AppRoutes.addRoom),
             ],
           ),

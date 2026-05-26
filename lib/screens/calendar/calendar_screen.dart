@@ -225,7 +225,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                         (program) => DropdownMenuItem<String>(
                           value: program['id'] as String,
                           child: Text(
-                            (program['program_name'] ?? program['id'])
+                            (program['program_name'] ??
+                                    program['name'] ??
+                                    program['id'])
                                 .toString(),
                             overflow: TextOverflow.ellipsis,
                           ),

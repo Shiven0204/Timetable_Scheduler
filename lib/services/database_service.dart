@@ -23,23 +23,33 @@ class DatabaseService {
     }
   }
 
+  /// Saves program with canonical fields plus legacy keys for timetable/mapping UIs.
   Future<void> saveProgram({
-    required String programName,
-    required String branchName,
-    required String departmentId,
+    required String name,
+    required String shortName,
+    int? studentCount,
+    String? departmentId,
   }) async {
     try {
-      if (programName.isEmpty ||
-          branchName.isEmpty ||
-          departmentId.isEmpty) {
-        throw Exception("Fields cannot be empty");
+      if (name.isEmpty || shortName.isEmpty) {
+        throw Exception('Program name and short name are required');
       }
-      await _db.collection('Programs').add({
-        'program_name': programName,
-        'branch_name': branchName,
-        'department_id': departmentId,
+
+      final data = <String, dynamic>{
+        'name': name,
+        'short_name': shortName,
+        'program_name': name,
+        'branch_name': shortName,
         'created_at': FieldValue.serverTimestamp(),
-      });
+      };
+      if (studentCount != null) {
+        data['student_count'] = studentCount;
+      }
+      if (departmentId != null && departmentId.trim().isNotEmpty) {
+        data['department_id'] = departmentId.trim();
+      }
+
+      await _db.collection('Programs').add(data);
 
       debugPrint('Program saved successfully');
     } catch (e) {
@@ -48,26 +58,63 @@ class DatabaseService {
     }
   }
 
-  Future<void> saveFaculty({
-    required String facultyName,
-    required String email,
-    required List<String> expertise,
-    required int maxLecturesPerDay,
+  /// Legacy program save (subject/mapping flows that still pass branch + department).
+  Future<void> saveProgramLegacy({
+    required String programName,
+    required String branchName,
     required String departmentId,
   }) async {
+    await saveProgram(
+      name: programName,
+      shortName: branchName,
+      departmentId: departmentId,
+    );
+  }
+
+  Future<void> saveFaculty({
+    required String fullName,
+    required String shortName,
+    required int maxLecturesPerDay,
+    required String availability,
+    String? email,
+    String? role,
+    String? phone,
+    String? designation,
+    String? departmentId,
+  }) async {
     try {
-      if (facultyName.isEmpty || email.isEmpty || departmentId.isEmpty) {
-        throw Exception("Fields cannot be empty");
+      if (fullName.isEmpty || shortName.isEmpty) {
+        throw Exception('Faculty name and short name are required');
+      }
+      if (maxLecturesPerDay <= 0) {
+        throw Exception('Max lectures per day must be greater than zero');
       }
 
-      await _db.collection('Faculty').add({
-        'faculty_name': facultyName,
-        'email': email,
-        'expertise': expertise,
+      final data = <String, dynamic>{
+        'full_name': fullName,
+        'short_name': shortName,
+        'faculty_name': fullName,
         'max_lectures_per_day': maxLecturesPerDay,
-        'department_id': departmentId,
+        'availability': availability,
         'created_at': FieldValue.serverTimestamp(),
-      });
+      };
+      if (email != null && email.trim().isNotEmpty) {
+        data['email'] = email.trim();
+      }
+      if (role != null && role.trim().isNotEmpty) {
+        data['role'] = role.trim();
+      }
+      if (phone != null && phone.trim().isNotEmpty) {
+        data['phone'] = phone.trim();
+      }
+      if (designation != null && designation.trim().isNotEmpty) {
+        data['designation'] = designation.trim();
+      }
+      if (departmentId != null && departmentId.trim().isNotEmpty) {
+        data['department_id'] = departmentId.trim();
+      }
+
+      await _db.collection('Faculty').add(data);
 
       debugPrint('Faculty saved successfully');
     } catch (e) {
@@ -137,21 +184,32 @@ class DatabaseService {
   }
 
   Future<void> saveRoom({
-    required String roomName,
+    required String name,
     required String roomType,
     required int capacity,
+    String? buildingName,
   }) async {
     try {
-      if (roomName.isEmpty || roomType.isEmpty) {
-        throw Exception("Fields cannot be empty");
+      if (name.isEmpty || roomType.isEmpty) {
+        throw Exception('Room name and type are required');
+      }
+      if (capacity <= 0) {
+        throw Exception('Capacity must be greater than zero');
       }
 
-      await _db.collection('Rooms').add({
-        'room_name': roomName,
-        'room_type': RoomTypeUtils.normalizeForFirestore(roomType),
+      final normalizedType = RoomTypeUtils.normalizeForFirestore(roomType);
+      final data = <String, dynamic>{
+        'name': name,
+        'room_name': name,
+        'room_type': normalizedType,
         'capacity': capacity,
         'created_at': FieldValue.serverTimestamp(),
-      });
+      };
+      if (buildingName != null && buildingName.trim().isNotEmpty) {
+        data['building_name'] = buildingName.trim();
+      }
+
+      await _db.collection('Rooms').add(data);
 
       debugPrint('Room saved successfully');
     } catch (e) {
