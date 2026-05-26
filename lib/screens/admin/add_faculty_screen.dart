@@ -89,6 +89,10 @@ class _AddFacultyScreenState extends State<AddFacultyScreen> {
       _showSnack('Short name is required');
       return;
     }
+    if (_selectedDepartmentId == null) {
+      _showSnack('Department is required');
+      return;
+    }
 
     final maxLectures = int.tryParse(maxText);
     if (maxLectures == null || maxLectures <= 0) {
@@ -107,7 +111,7 @@ class _AddFacultyScreenState extends State<AddFacultyScreen> {
         role: _roleController.text.trim(),
         phone: _phoneController.text.trim(),
         designation: _designationController.text.trim(),
-        departmentId: _selectedDepartmentId,
+        departmentId: _selectedDepartmentId!,
       );
       if (!mounted) return;
       _showSnack('Faculty saved');
@@ -211,6 +215,25 @@ class _AddFacultyScreenState extends State<AddFacultyScreen> {
                       );
                     }).toList(),
                   ),
+                  const SizedBox(height: 16),
+                  InputDecorator(
+                    decoration: instituteInputDecoration('Department *'),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<String>(
+                        isExpanded: true,
+                        value: _selectedDepartmentId,
+                        hint: const Text('Select department'),
+                        items: _departments.map((d) {
+                          return DropdownMenuItem<String>(
+                            value: d['id'] as String,
+                            child: Text(d['name'].toString()),
+                          );
+                        }).toList(),
+                        onChanged: (value) =>
+                            setState(() => _selectedDepartmentId = value),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -263,30 +286,7 @@ class _AddFacultyScreenState extends State<AddFacultyScreen> {
                             controller: _designationController,
                             decoration: instituteInputDecoration('Designation'),
                           ),
-                          if (_departments.isNotEmpty) ...[
-                            const SizedBox(height: 12),
-                            InputDecorator(
-                              decoration: instituteInputDecoration(
-                                'Department (optional)',
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<String>(
-                                  isExpanded: true,
-                                  value: _selectedDepartmentId,
-                                  hint: const Text('None'),
-                                  items: _departments.map((d) {
-                                    return DropdownMenuItem<String>(
-                                      value: d['id'] as String,
-                                      child: Text(d['name'].toString()),
-                                    );
-                                  }).toList(),
-                                  onChanged: (value) {
-                                    setState(() => _selectedDepartmentId = value);
-                                  },
-                                ),
-                              ),
-                            ),
-                          ],
+                          // Department is required and configured in main details.
                         ],
                       ),
                     ),

@@ -167,6 +167,9 @@ class TimetableService {
             .map((key, value) => MapEntry(key, value.toString()));
         final labRoomMap = (programInfo['labRoomMap'] as Map<String, dynamic>? ?? {})
             .map((key, value) => MapEntry(key, value.toString()));
+        final labFrequencyMap =
+            (programInfo['labFrequencyMap'] as Map<String, dynamic>? ?? {})
+                .map((key, value) => MapEntry(key, (value as num).toInt()));
 
         final labSubjects = subjects
             .where((subject) => subject['is_lab'] == true)
@@ -178,16 +181,11 @@ class TimetableService {
           continue;
         }
 
-        final scheduledLabSubjectsThisProgram = <String>{};
-
         for (final subject in labSubjects) {
           final subjectId = (subject['id'] ?? '').toString();
           final facultyId = (facultyMap[subjectId] ?? '').toString();
           final mappedLabRoomId = (labRoomMap[subjectId] ?? '').toString();
           if (subjectId.isEmpty || facultyId.isEmpty || mappedLabRoomId.isEmpty) {
-            continue;
-          }
-          if (scheduledLabSubjectsThisProgram.contains(subjectId)) {
             continue;
           }
           final roomDoc = roomById[mappedLabRoomId];
@@ -199,17 +197,26 @@ class TimetableService {
             continue;
           }
 
-          final placed = _tryPlaceLabForProgram(
-            programGrid: programGrid,
-            orderedDays: orderedDays,
-            subjectId: subjectId,
-            facultyId: facultyId,
-            roomId: mappedLabRoomId,
-            facultySchedule: facultySchedule,
-            roomSchedule: roomSchedule,
-          );
-          if (placed) {
-            scheduledLabSubjectsThisProgram.add(subjectId);
+          final blocksNeeded = (labFrequencyMap[subjectId] ?? 1).clamp(1, 10);
+          var blocksPlaced = 0;
+          while (blocksPlaced < blocksNeeded) {
+            final placed = _tryPlaceLabForProgram(
+              programGrid: programGrid,
+              orderedDays: orderedDays,
+              subjectId: subjectId,
+              facultyId: facultyId,
+              roomId: mappedLabRoomId,
+              facultySchedule: facultySchedule,
+              roomSchedule: roomSchedule,
+            );
+            if (!placed) {
+              dev.log(
+                'Could not place all lab blocks for subject $subjectId in program $programId. Remaining: ${blocksNeeded - blocksPlaced}',
+                name: 'TimetableService',
+              );
+              break;
+            }
+            blocksPlaced++;
           }
         }
       }
@@ -266,6 +273,9 @@ class TimetableService {
         final theoryRoomMap =
             (programInfo['theoryRoomMap'] as Map<String, dynamic>? ?? {})
                 .map((key, value) => MapEntry(key, value.toString()));
+        final theoryFrequencyMap =
+            (programInfo['theoryFrequencyMap'] as Map<String, dynamic>? ?? {})
+                .map((key, value) => MapEntry(key, (value as num).toInt()));
         final programGrid =
             (timetable[programId] as Map<String, dynamic>? ?? <String, dynamic>{});
         if (programGrid.isEmpty) {
@@ -281,7 +291,10 @@ class TimetableService {
 
           final credits = (subject['credits'] as num?)?.toInt() ?? 0;
           final isLabCourse = subject['is_lab'] == true;
-          final lecturesTarget = _theoryPeriodsPerWeek(credits: credits, isLabCourse: isLabCourse);
+          final override = theoryFrequencyMap[subjectId];
+          final lecturesTarget = (override != null && override > 0)
+              ? override
+              : _theoryPeriodsPerWeek(credits: credits, isLabCourse: isLabCourse);
           if (lecturesTarget <= 0) {
             continue;
           }
@@ -445,6 +458,8 @@ class TimetableService {
         final facultyMap = <String, String>{};
         final theoryRoomMap = <String, String>{};
         final labRoomMap = <String, String>{};
+        final theoryFrequencyMap = <String, int>{};
+        final labFrequencyMap = <String, int>{};
 
         for (final subject in subjects) {
           final subjectId = (subject['id'] ?? '').toString().trim();
@@ -479,6 +494,12 @@ class TimetableService {
               .toString()
               .trim();
           final labRoomId = (row['lab_room_id'] ?? '').toString().trim();
+          final theoryFrequency =
+              (row['theory_frequency'] as num?)?.toInt() ??
+                  (row['theoryFrequency'] as num?)?.toInt();
+          final labFrequency =
+              (row['lab_frequency'] as num?)?.toInt() ??
+                  (row['labFrequency'] as num?)?.toInt();
 
           if (theoryRoomId.isEmpty) {
             dev.log(
@@ -514,10 +535,17 @@ class TimetableService {
               continue;
             }
             labRoomMap[subjectId] = labRoomId;
+            final lf = labFrequency ?? 1;
+            if (lf > 0) {
+              labFrequencyMap[subjectId] = lf;
+            }
           }
 
           facultyMap[subjectId] = facultyId;
           theoryRoomMap[subjectId] = theoryRoomId;
+          if (theoryFrequency != null && theoryFrequency > 0) {
+            theoryFrequencyMap[subjectId] = theoryFrequency;
+          }
         }
 
         timetableData[programId] = {
@@ -525,6 +553,8 @@ class TimetableService {
           'facultyMap': facultyMap,
           'theoryRoomMap': theoryRoomMap,
           'labRoomMap': labRoomMap,
+          'theoryFrequencyMap': theoryFrequencyMap,
+          'labFrequencyMap': labFrequencyMap,
         };
       }
 

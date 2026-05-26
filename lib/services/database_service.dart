@@ -125,6 +125,7 @@ class DatabaseService {
 
   Future<void> saveSubject({
     required String subjectName,
+    required String shortName,
     required int credits,
     required bool isLab,
     required String programId,
@@ -135,6 +136,8 @@ class DatabaseService {
       }
 
       await _db.collection('Subjects').add({
+        'name': subjectName,
+        'short_name': shortName,
         'subject_name': subjectName,
         'credits': credits,
         'is_lab': isLab,
@@ -157,7 +160,9 @@ class DatabaseService {
     required String programId,
     required String theoryRoomId,
     String? labRoomId,
-    String? departmentId,
+    required String departmentId,
+    required int theoryFrequency,
+    int? labFrequency,
   }) async {
     try {
       final data = <String, dynamic>{
@@ -166,14 +171,16 @@ class DatabaseService {
         'program_id': programId,
         'theory_room_id': theoryRoomId,
         'room_id': theoryRoomId,
+        'theory_frequency': theoryFrequency,
         'created_at': FieldValue.serverTimestamp(),
       };
       if (labRoomId != null && labRoomId.trim().isNotEmpty) {
         data['lab_room_id'] = labRoomId.trim();
       }
-      if (departmentId != null && departmentId.trim().isNotEmpty) {
-        data['department_id'] = departmentId.trim();
+      if (labFrequency != null) {
+        data['lab_frequency'] = labFrequency;
       }
+      data['department_id'] = departmentId.trim();
       await _db.collection('Mappings').add(data);
 
       debugPrint('Mapping saved');
