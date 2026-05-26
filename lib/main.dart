@@ -19,6 +19,7 @@ import 'package:timetable_scheduler/screens/admin/add_mapping_screen.dart';
 import 'package:timetable_scheduler/screens/faculty/faculty_schedule_screen.dart';
 import 'package:timetable_scheduler/screens/calendar/calendar_screen.dart';
 import 'package:timetable_scheduler/screens/student/view_timetable_screen.dart';
+import 'package:timetable_scheduler/widgets/role_protected.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -39,21 +40,69 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       home: const AuthGate(),
       routes: {
-        AppRoutes.dashboard: (context) => const DashboardScreen(),
-        AppRoutes.overview: (context) => const OverviewScreen(),
-        AppRoutes.timetableConfig: (context) => const TimetableConfigScreen(),
-        AppRoutes.addDepartment: (context) => const AddDepartmentScreen(),
-        AppRoutes.addProgram: (context) => const AddProgramScreen(),
-        AppRoutes.addFaculty: (context) => const AddFacultyScreen(),
-        AppRoutes.addSubject: (context) => const AddSubjectScreen(),
-        AppRoutes.addRoom: (context) => const AddRoomScreen(),
-        AppRoutes.addMapping: (context) => const AddMappingScreen(),
-        AppRoutes.viewTimetable: (context) => const ViewTimetableScreen(),
-        AppRoutes.facultySchedule: (context) => const FacultyScheduleScreen(),
-        AppRoutes.instituteData: (context) => const InstituteDataScreen(),
-        AppRoutes.lectureConfiguration: (context) =>
-            const LectureConfigurationScreen(),
-        AppRoutes.myTimetables: (context) => const MyTimetablesScreen(),
+        // Home route (role-aware dashboard; all roles allowed).
+        AppRoutes.dashboard: (context) => RoleProtected(
+              allowedRoles: {'admin', 'faculty', 'student'},
+              child: DashboardScreen(),
+            ),
+
+        // Admin-only screens.
+        AppRoutes.overview: (context) => RoleProtected(
+              allowedRoles: {'admin'},
+              child: OverviewScreen(),
+            ),
+        AppRoutes.timetableConfig: (context) => RoleProtected(
+              allowedRoles: {'admin'},
+              child: TimetableConfigScreen(),
+            ),
+        AppRoutes.addDepartment: (context) => RoleProtected(
+              allowedRoles: {'admin'},
+              child: AddDepartmentScreen(),
+            ),
+        AppRoutes.addProgram: (context) => RoleProtected(
+              allowedRoles: {'admin'},
+              child: AddProgramScreen(),
+            ),
+        AppRoutes.addFaculty: (context) => RoleProtected(
+              allowedRoles: {'admin'},
+              child: AddFacultyScreen(),
+            ),
+        AppRoutes.addSubject: (context) => RoleProtected(
+              allowedRoles: {'admin'},
+              child: AddSubjectScreen(),
+            ),
+        AppRoutes.addRoom: (context) => RoleProtected(
+              allowedRoles: {'admin'},
+              child: AddRoomScreen(),
+            ),
+        AppRoutes.addMapping: (context) => RoleProtected(
+              allowedRoles: {'admin'},
+              child: AddMappingScreen(),
+            ),
+        AppRoutes.instituteData: (context) => RoleProtected(
+              allowedRoles: {'admin'},
+              child: InstituteDataScreen(),
+            ),
+        AppRoutes.lectureConfiguration: (context) => RoleProtected(
+              allowedRoles: {'admin'},
+              child: LectureConfigurationScreen(),
+            ),
+        AppRoutes.myTimetables: (context) => RoleProtected(
+              allowedRoles: {'admin'},
+              child: MyTimetablesScreen(),
+            ),
+        AppRoutes.viewTimetable: (context) => RoleProtected(
+              allowedRoles: {'admin', 'student'},
+              child: ViewTimetableScreen(),
+            ),
+
+        // Faculty screens (faculty/admin).
+        AppRoutes.facultySchedule: (context) => RoleProtected(
+              allowedRoles: {'admin', 'faculty'},
+              child: FacultyScheduleScreen(),
+            ),
+
+        // Calendar is allowed for all roles.
         AppRoutes.calendar: (context) => const CalendarScreen(),
       },
     );
