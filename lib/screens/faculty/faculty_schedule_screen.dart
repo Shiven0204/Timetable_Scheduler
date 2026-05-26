@@ -1,12 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:timetable_scheduler/models/app_user_profile.dart';
+import 'package:timetable_scheduler/routes/app_routes.dart';
 import 'package:timetable_scheduler/services/timetable_firestore_helpers.dart';
 import 'package:timetable_scheduler/services/timetable_name_resolver.dart';
 import 'package:timetable_scheduler/services/timetable_service.dart';
+import 'package:timetable_scheduler/widgets/logout_app_bar_action.dart';
 import 'package:timetable_scheduler/widgets/timetable_grid.dart';
 
 class FacultyScheduleScreen extends StatefulWidget {
-  const FacultyScheduleScreen({super.key});
+  const FacultyScheduleScreen({super.key, this.profile});
+
+  final AppUserProfile? profile;
 
   @override
   State<FacultyScheduleScreen> createState() => _FacultyScheduleScreenState();
@@ -189,6 +194,15 @@ class _FacultyScheduleScreenState extends State<FacultyScheduleScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Faculty Schedule'),
+        actions: [
+          IconButton(
+            tooltip: 'Calendar',
+            icon: const Icon(Icons.calendar_month_outlined),
+            onPressed: () =>
+                Navigator.pushNamed(context, AppRoutes.calendar),
+          ),
+          const LogoutAppBarAction(),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),

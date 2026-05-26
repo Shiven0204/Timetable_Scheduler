@@ -1,33 +1,24 @@
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:timetable_scheduler/screens/auth/login_screen.dart';
+import 'package:timetable_scheduler/models/app_user_profile.dart';
 import 'package:timetable_scheduler/routes/app_routes.dart';
-import 'package:timetable_scheduler/services/auth_service.dart';
+import 'package:timetable_scheduler/widgets/logout_app_bar_action.dart';
 
+/// Admin home — shown only when [AppUserProfile.role] is `admin` ([AuthGate]).
 class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({super.key});
+  const DashboardScreen({super.key, this.profile});
+
+  final AppUserProfile? profile;
 
   static const _instituteName = 'Tech Institute';
 
-  String _displayName(User? user) {
-    if (user == null) return 'User';
-    final name = user.displayName?.trim();
+  String _displayName() {
+    final name = profile?.name.trim();
     if (name != null && name.isNotEmpty) return name;
-    final email = user.email?.trim();
+    final email = profile?.email;
     if (email != null && email.isNotEmpty) {
-      final local = email.split('@').first;
-      if (local.isNotEmpty) return local;
+      return email.split('@').first;
     }
-    return 'User';
-  }
-
-  String _roleLabel(String? role) {
-    if (role == null) return 'Unknown';
-    final r = role.trim().toLowerCase();
-    if (r == 'admin') return 'Admin';
-    if (r == 'faculty') return 'Faculty';
-    if (r == 'student') return 'Student';
-    return r.isEmpty ? 'Unknown' : r[0].toUpperCase() + r.substring(1);
+    return 'Admin';
   }
 
   String _greetingForNow() {
@@ -41,106 +32,56 @@ class DashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final greeting = _greetingForNow();
-    final user = FirebaseAuth.instance.currentUser;
-    final userName = _displayName(user);
+    final userName = _displayName();
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dashboard'),
-        actions: [
-          IconButton(
-            tooltip: 'Sign out',
-            icon: const Icon(Icons.logout_rounded),
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              if (!context.mounted) return;
-              // Clear the navigation stack to prevent back-navigation into protected screens.
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (_) => const LoginScreen(),
-                ),
-                (route) => false,
-              );
-            },
-          ),
-        ],
+        actions: const [LogoutAppBarAction()],
       ),
-      body: FutureBuilder<String?>(
-        future: AuthService().getCurrentUserRole(),
-        builder: (context, snapshot) {
-          final role = snapshot.data;
-
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (role == null) {
-            return const Center(child: Text('Access Denied'));
-          }
-
-          final roleLabel = _roleLabel(role);
-          final showAdmin = role == 'admin';
-          final showFaculty = role == 'faculty';
-          final showStudent = role == 'student';
-          final isKnownRole = showAdmin || showFaculty || showStudent;
-          if (!isKnownRole) {
-            return const Center(child: Text('Access Denied'));
-          }
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$greeting, $userName',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.5,
-                      ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  _instituteName,
-                  style: TextStyle(
-                    fontSize: 15,
-                    color: scheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$greeting, $userName',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
                   ),
-                ),
-                const SizedBox(height: 12),
-                Chip(
-                  label: Text(roleLabel),
-                  avatar: Icon(
-                    Icons.verified_user_outlined,
-                    size: 18,
-                    color: scheme.primary,
-                  ),
-                  visualDensity: VisualDensity.compact,
-                  side: BorderSide(color: scheme.outlineVariant),
-                ),
-                const SizedBox(height: 28),
-                Text(
-                  'Dashboard',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                      ),
-                ),
-                const SizedBox(height: 12),
-
-                if (showAdmin) ...[
-                  _AdminDashboardCards(scheme: scheme),
-                ] else if (showFaculty) ...[
-                  _FacultyDashboardCards(scheme: scheme),
-                ] else if (showStudent) ...[
-                  _StudentDashboardCards(scheme: scheme),
-                ] else ...[
-                  const SizedBox.shrink(),
-                ],
-              ],
             ),
-          );
-        },
+            const SizedBox(height: 6),
+            Text(
+              _instituteName,
+              style: TextStyle(
+                fontSize: 15,
+                color: scheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Chip(
+              label: const Text('Admin'),
+              avatar: Icon(
+                Icons.verified_user_outlined,
+                size: 18,
+                color: scheme.primary,
+              ),
+              visualDensity: VisualDensity.compact,
+              side: BorderSide(color: scheme.outlineVariant),
+            ),
+            const SizedBox(height: 28),
+            Text(
+              'Quick actions',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            _AdminDashboardCards(scheme: scheme),
+          ],
+        ),
       ),
     );
   }
@@ -230,100 +171,6 @@ class _AdminDashboardCards extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ],
-    );
-  }
-}
-
-class _FacultyDashboardCards extends StatelessWidget {
-  const _FacultyDashboardCards({required this.scheme});
-
-  final ColorScheme scheme;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _QuickActionCard(
-            title: 'My Schedule',
-            subtitle: 'Faculty weekly timetable',
-            icon: Icons.person,
-            gradient: LinearGradient(
-              colors: [
-                scheme.primary,
-                Color.lerp(scheme.primary, scheme.tertiary, 0.35)!,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            onTap: () => Navigator.pushNamed(context, AppRoutes.facultySchedule),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _QuickActionCard(
-            title: 'View Calendar',
-            subtitle: 'Weekly grid by program',
-            icon: Icons.calendar_month_rounded,
-            gradient: LinearGradient(
-              colors: [
-                scheme.tertiary,
-                Color.lerp(scheme.tertiary, scheme.secondary, 0.25)!,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            onTap: () => Navigator.pushNamed(context, AppRoutes.calendar),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StudentDashboardCards extends StatelessWidget {
-  const _StudentDashboardCards({required this.scheme});
-
-  final ColorScheme scheme;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: _QuickActionCard(
-            title: 'View Timetable',
-            subtitle: 'Weekly timetable by program',
-            icon: Icons.table_chart,
-            gradient: LinearGradient(
-              colors: [
-                scheme.primary,
-                Color.lerp(scheme.primary, scheme.tertiary, 0.35)!,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            onTap: () => Navigator.pushNamed(context, AppRoutes.viewTimetable),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _QuickActionCard(
-            title: 'Calendar',
-            subtitle: 'Weekly grid view',
-            icon: Icons.calendar_month_rounded,
-            gradient: LinearGradient(
-              colors: [
-                scheme.tertiary,
-                Color.lerp(scheme.tertiary, scheme.secondary, 0.25)!,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            onTap: () => Navigator.pushNamed(context, AppRoutes.calendar),
-          ),
         ),
       ],
     );

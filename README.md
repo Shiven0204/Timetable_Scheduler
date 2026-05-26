@@ -50,13 +50,21 @@ Administrators configure the institute, map each subject to a faculty member and
 
 ## 5. Authentication
 
-- **Sign-in**: `LoginScreen` uses `FirebaseAuth.instance.signInWithEmailAndPassword` after validating non-empty fields and email shape. Errors (e.g. `wrong-password`, `user-not-found`, `invalid-email`, `network-request-failed`) are surfaced via snackbars using **`lib/utils/auth_error_messages.dart`**.
-- **Session**: `AuthGate` combines `authStateChanges()` with **`FirebaseAuth.instance.currentUser`** so a restored session opens the dashboard without flashing the login UI unnecessarily.
-- **Sign-out**: Dashboard app bar **logout** icon calls `FirebaseAuth.instance.signOut()`; `AuthGate` then shows `LoginScreen` again.
-- **Routing**: The app does **not** use a named `/login` route as the initial stack entry; unauthenticated users never reach the dashboard through the previous “tap Login without credentials” path.
-- **Admin users**: Create users in **Firebase Console → Authentication → Users** (e.g. for development). **Do not** commit passwords or service accounts to the repository. In **Authentication → Sign-in method**, enable **Email/Password**.
+- **Sign-in**: `LoginScreen` → Firebase Auth → load `users/{uid}` → role-based home (see **`docs/FIREBASE_TEST_USERS.md`** for test accounts).
+- **Roles**: `admin` → `DashboardScreen`; `faculty` → `FacultyScheduleScreen`; `student` → `ViewTimetableScreen`.
+- **Session**: `AuthGate` listens to `authStateChanges()`, fetches profile, routes by role; missing profile shows setup screen with UID.
+- **Sign-out**: `LogoutAppBarAction` / `AuthService.signOut()` — `AuthGate` returns to login (no back-stack bypass).
+- **Test users** (create in Firebase Console, not in app code):
 
-Firestore **security rules** should require authentication (and appropriate roles, if you add them later) for production data.
+| Email | Password | Firestore `role` |
+|-------|----------|------------------|
+| `admin@timetable.com` | `Admin@123` | `admin` |
+| `faculty@timetable.com` | `Faculty@123` | `faculty` |
+| `student@timetable.com` | `Student@123` | `student` |
+
+Document id for each: **Authentication User UID** in collection `users`.
+
+Firestore **security rules** should allow authenticated users to read their own `users/{uid}` document (see `docs/FIREBASE_TEST_USERS.md`).
 
 ---
 

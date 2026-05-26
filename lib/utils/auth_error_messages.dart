@@ -1,4 +1,21 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:timetable_scheduler/models/app_user_profile.dart';
+
+/// User-readable copy when Firestore profile is missing or invalid.
+String messageForMissingProfile(ProfileLoadResult result) {
+  switch (result.status) {
+    case ProfileLoadStatus.notFound:
+      return 'Account not set up. An admin must create your profile in Firestore (users/your-uid with role admin, faculty, or student).';
+    case ProfileLoadStatus.invalidRole:
+      return result.message ??
+          'Your account role is invalid. Use admin, faculty, or student.';
+    case ProfileLoadStatus.firestoreError:
+      return result.message ??
+          'Could not load your profile. Check Firestore rules and connection.';
+    case ProfileLoadStatus.found:
+      return 'Unexpected profile error.';
+  }
+}
 
 /// User-readable copy for common [FirebaseAuthException] codes.
 String messageForFirebaseAuth(FirebaseAuthException e) {
