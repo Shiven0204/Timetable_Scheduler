@@ -2,6 +2,7 @@ class AppRoutes {
   static const login = '/login';
   static const dashboard = '/dashboard';
   static const overview = '/overview';
+  static const basicInformation = '/basic-information';
   static const timetableConfig = '/timetable-config';
   static const addDepartment = '/add_department';
   static const addProgram = '/add_program';

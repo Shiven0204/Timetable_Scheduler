@@ -63,6 +63,15 @@ class _OverviewScreenState extends State<OverviewScreen> {
               ),
               const SizedBox(height: 20),
               _buildNavCard(
+                title: 'Basic Information',
+                icon: Icons.info_outline,
+                color: primaryColor,
+                onTap: () {
+                  Navigator.pushNamed(context, AppRoutes.basicInformation);
+                },
+              ),
+              const SizedBox(height: 14),
+              _buildNavCard(
                 title: 'Data Input',
                 icon: Icons.storage,
                 color: primaryColor,

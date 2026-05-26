@@ -15,6 +15,7 @@ Administrators configure the institute, map each subject to a faculty member and
 - **Firebase Authentication** (email / password): sign-in validation, loading state, mapped error messages; **session persistence** via `authStateChanges()`; **sign out** from the dashboard app bar
 - **Firestore** for institute data and generated timetables
 - Admin dashboard (quick actions: My Timetables, Calendar)
+- **Basic Information** hub: timetable metadata, academic session, bell schedule, working days, periods & breaks (first config step before generation)
 - Overview hub: data setup, lecture configuration, generate timetable, navigation to views
 - CRUD-style flows: departments, programs, faculty, subjects, rooms, **mappings (theory room + optional lab room)**
 - Timetable configuration (`working_days`, `periods_per_day`, etc.)
@@ -31,7 +32,8 @@ Administrators configure the institute, map each subject to a faculty member and
 | **Screens** | Material UI, forms, navigation (`lib/screens/`) |
 | **Auth** | `AuthGate` (`lib/widgets/auth_gate.dart`) — root listens to `FirebaseAuth.instance.authStateChanges()`; signed-in users see `DashboardScreen`, others see `LoginScreen` |
 | **Routes** | Named routes in `lib/routes/app_routes.dart`, registered in `main.dart` (app `home` is `AuthGate`, not `/login`) |
-| **Services** | `DatabaseService` (writes), `TimetableService` (read config, prepare data, schedule, save), `TimetableNameResolver` / helpers for UI |
+| **Services** | `DatabaseService` (writes), `BasicInformationService` (timetable-level config), `TimetableService` (read config, prepare data, schedule, save), `TimetableNameResolver` / helpers for UI |
+| **Models** | `BasicInformation`, `ScheduleSlot`, `AcademicSession` (`lib/models/`) |
 | **Utils** | `RoomTypeUtils` (`lib/utils/room_type_utils.dart`), `messageForFirebaseAuth` (`lib/utils/auth_error_messages.dart`) |
 | **Widgets** | `TimetableGrid`, `AuthGate`, shared layout pieces (`lib/widgets/`) |
 | **Firebase** | `firebase_options.dart`, **Authentication** (email/password), Firestore collections listed below |
@@ -68,10 +70,26 @@ Firestore **security rules** should require authentication (and appropriate role
 | `Subjects` | Subjects (`subject_name`, `program_id`, `credits`, **`is_lab`**) — see §8 for meaning of `is_lab` |
 | `Rooms` | Rooms (`room_name`, **`room_type`**: canonical **`classroom`** or **`lab`** (lowercase in Firestore; UI may show title case), `capacity`) |
 | `Mappings` | Per program: `subject_id`, `faculty_id`, **`theory_room_id`**, optional **`lab_room_id`** (required when subject `is_lab` is true), legacy **`room_id`** (mirrors `theory_room_id` on save), optional `department_id`, `created_at` |
-| `config` / `timetable` doc | `working_days` / `working_days_per_week`, `periods` / `periods_per_day`, … |
+| `timetable_config` / `basic_information` | Full bell-schedule payload: `timetable_name`, `description`, `academic_session`, `schedule_type`, `cycle_weeks`, `schedule_mode`, `working_days`, `periods`, `breaks`, `day_schedules` |
+| `config` / `timetable` doc | Engine fields synced from Basic Information: `working_days_per_week`, `periods_per_day`, `timetable_name`, … |
 | `timetable` | Generated slots: `program_id`, `day` (0-based), `period`, `subject_id`, `faculty_id`, `room_id`, `type` (`lab` / `theory`), `created_at` |
 
 Collection name casing may vary (`Programs` vs `programs`); `TimetableService` tries common variants when reading.
+
+### Basic Information module
+
+Administrators open **Overview → Basic Information** as the **first configuration step** before institute data, mappings, or generation.
+
+| Area | Details |
+|------|---------|
+| **Timetable info** | Required name; optional description |
+| **Academic session** | Optional session name + start/end dates (all three required if any field is used) |
+| **Schedule type** | `weekly`, `fortnightly`, or `custom` (with cycle week count) |
+| **Schedule mode** | `uniform` (same periods all working days) or `custom_day` (per-day periods/breaks) |
+| **Working days** | Multi-select chips (Sun–Sat); Weekdays / Clear helpers |
+| **Periods & breaks** | Dynamic list with name + start/end time pickers; add/remove rows |
+
+On **Save**, data is stored at `timetable_config/basic_information` and key engine fields are merged into `config/timetable` so existing `TimetableService.getConfig()` continues to work.
 
 ### Room type system (`classroom` vs `lab`)
 
@@ -136,6 +154,7 @@ Sign in (valid Firebase Auth user) → Dashboard
 Dashboard → Sign out → Login
 
 Overview
+  → Basic Information (timetable + bell schedule)
   → Institute Data (department, program, faculty, subject, room, mapping)
   → Lecture Configuration
   → View Timetable / Faculty Schedule
@@ -152,13 +171,14 @@ Timetable Configuration screen: save config, prepare data, optional stepwise lab
 |------|--------|
 | Auth | `LoginScreen` (email/password, validation, loading state); `AuthGate` (session routing at app root) |
 | Admin | `DashboardScreen` (greeting from signed-in user, **logout** in app bar), `OverviewScreen`, `MyTimetablesScreen`, `InstituteDataScreen`, `LectureConfigurationScreen`, `TimetableConfigScreen` |
-| Forms | Add department/program/faculty/subject/**room**/**mapping** |
+| Forms | **Basic Information**, add department/program/faculty/subject/**room**/**mapping** |
 | Views | `ViewTimetableScreen`, `FacultyScheduleScreen`, `CalendarScreen` |
 
 ---
 
 ## 11. Current implementation status
 
+- **Basic Information** screen with Firestore persistence and engine config sync
 - **Firebase Auth** wired with **`AuthGate`** as `MaterialApp` `home`; email/password sign-in and dashboard **sign out**
 - **Named routes** for admin and views (e.g. `/my-timetables`, `/calendar`); initial UI is **not** an anonymous dashboard
 - **Mappings** store `theory_room_id` + optional `lab_room_id` (+ `room_id` mirror for legacy reads)

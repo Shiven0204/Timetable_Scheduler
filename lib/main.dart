@@ -12,6 +12,7 @@ import 'package:timetable_scheduler/screens/admin/dashboard_screen.dart';
 import 'package:timetable_scheduler/screens/admin/institute_data_screen.dart';
 import 'package:timetable_scheduler/screens/admin/lecture_configuration_screen.dart';
 import 'package:timetable_scheduler/screens/admin/my_timetables_screen.dart';
+import 'package:timetable_scheduler/screens/admin/basic_information_screen.dart';
 import 'package:timetable_scheduler/screens/admin/overview_screen.dart';
 import 'package:timetable_scheduler/screens/admin/timetable_config_screen.dart';
 import 'package:timetable_scheduler/widgets/auth_gate.dart';
@@ -50,6 +51,10 @@ class MyApp extends StatelessWidget {
         AppRoutes.overview: (context) => RoleProtected(
               allowedRoles: {'admin'},
               child: OverviewScreen(),
+            ),
+        AppRoutes.basicInformation: (context) => RoleProtected(
+              allowedRoles: {'admin'},
+              child: BasicInformationScreen(),
             ),
         AppRoutes.timetableConfig: (context) => RoleProtected(
               allowedRoles: {'admin'},
