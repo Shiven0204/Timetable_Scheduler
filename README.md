@@ -17,7 +17,8 @@ Administrators configure the institute, map each subject to a faculty member and
 - Admin dashboard (quick actions: My Timetables, Calendar)
 - **Basic Information** hub: timetable metadata, academic session, bell schedule, working days, periods & breaks (first config step before generation)
 - Overview hub: data setup, lecture configuration, generate timetable, navigation to views
-- CRUD-style flows: departments, programs, faculty, subjects, rooms, **mappings (theory room + optional lab room)**
+- **Popup-based institute data** entry (department, program, faculty, room) for faster configuration
+- CRUD-style flows: subjects, rooms, **mappings (theory room + optional lab room)** (plus institute entities above)
 - Timetable configuration (`working_days`, `periods_per_day`, etc.)
 - **Timetable engine**: lab scheduling → theory scheduling → **persist** flat `timetable` documents
 - **Student timetable** (by program), **faculty schedule** (by faculty), **calendar grid** (by program)
@@ -99,13 +100,24 @@ Administrators open **Overview → Basic Information** as the **first configurat
 
 On **Save**, data is stored at `timetable_config/basic_information` and key engine fields are merged into `config/timetable` so existing `TimetableService.getConfig()` continues to work.
 
-### Institute Data module updates
+### Institute Data module (popup quick-entry)
+
+Institute Data uses a **dialog-based configuration UX** — no separate full-screen routes for department, program, faculty, or room.
+
+| Flow | Behavior |
+|------|----------|
+| **Open** | Overview → Institute Data → tap a card |
+| **Entry** | Modern **bottom sheet** with rounded top corners, scrollable form, keyboard-safe padding |
+| **Save** | **NEXT** validates → writes to Firestore → success snackbar → sheet closes automatically |
+| **Return** | You stay on Institute Data (no manual back from a form screen) |
+
+Forms reuse the same widgets and `DatabaseService` save logic as before (`add_*_screen.dart` with `embeddedInDialog: true`). Subject and mapping entry remain on their own screens via **Subject & Lecture Configuration**.
 
 - **Dashboard cleanup**: Admin dashboard quick actions now keep only **My Timetables** and **View Calendar**.
-- **Institute Data cleanup**: Subject entry is temporarily removed from Institute Data shortcuts; module still exists and is reachable from its route.
+- **Institute Data cleanup**: Subject entry is removed from Institute Data shortcuts; use **Subject & Lecture Configuration** instead.
 - **Faculty form**:
-  - Required: `full_name`, `short_name`, `max_lectures_per_day`, `availability`
-  - Optional (collapsed section): `email`, `role`, `phone`, `designation`, `department_id`
+  - Required: `full_name`, `short_name`, `department_id`, `max_lectures_per_day`, `availability`
+  - Optional (collapsed section): `email`, `role`, `phone`, `designation`
   - `short_name` auto-generates from full name and remains editable.
 - **Program form**:
   - Required: `name`, `short_name`
@@ -182,8 +194,8 @@ Dashboard → Sign out → Login
 
 Overview
   → Basic Information (timetable + bell schedule)
-  → Institute Data (department, program, faculty, subject, room, mapping)
-  → Lecture Configuration
+  → Institute Data (department, program, faculty, room — popup sheets + NEXT)
+  → Subject & Lecture Configuration (subject, mapping, generate)
   → View Timetable / Faculty Schedule
   → Generate Timetable
 ```
@@ -198,7 +210,7 @@ Timetable Configuration screen: save config, prepare data, optional stepwise lab
 |------|--------|
 | Auth | `LoginScreen` (email/password, validation, loading state); `AuthGate` (session routing at app root) |
 | Admin | `DashboardScreen` (greeting from signed-in user, **logout** in app bar), `OverviewScreen`, `MyTimetablesScreen`, `InstituteDataScreen`, `LectureConfigurationScreen`, `TimetableConfigScreen` |
-| Forms | **Basic Information**, add department/program/faculty/subject/**room**/**mapping** |
+| Forms | **Basic Information**; institute data via **popup sheets** (department/program/faculty/room); subject/**mapping** on dedicated screens |
 | Views | `ViewTimetableScreen`, `FacultyScheduleScreen`, `CalendarScreen` |
 
 ---

@@ -3,10 +3,6 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 
 import 'package:timetable_scheduler/routes/app_routes.dart';
-import 'package:timetable_scheduler/screens/admin/add_department_screen.dart';
-import 'package:timetable_scheduler/screens/admin/add_faculty_screen.dart';
-import 'package:timetable_scheduler/screens/admin/add_program_screen.dart';
-import 'package:timetable_scheduler/screens/admin/add_room_screen.dart';
 import 'package:timetable_scheduler/screens/admin/add_subject_screen.dart';
 import 'package:timetable_scheduler/screens/admin/dashboard_screen.dart';
 import 'package:timetable_scheduler/screens/admin/institute_data_screen.dart';
@@ -60,25 +56,9 @@ class MyApp extends StatelessWidget {
               allowedRoles: {'admin'},
               child: TimetableConfigScreen(),
             ),
-        AppRoutes.addDepartment: (context) => RoleProtected(
-              allowedRoles: {'admin'},
-              child: AddDepartmentScreen(),
-            ),
-        AppRoutes.addProgram: (context) => RoleProtected(
-              allowedRoles: {'admin'},
-              child: AddProgramScreen(),
-            ),
-        AppRoutes.addFaculty: (context) => RoleProtected(
-              allowedRoles: {'admin'},
-              child: AddFacultyScreen(),
-            ),
         AppRoutes.addSubject: (context) => RoleProtected(
               allowedRoles: {'admin'},
               child: AddSubjectScreen(),
-            ),
-        AppRoutes.addRoom: (context) => RoleProtected(
-              allowedRoles: {'admin'},
-              child: AddRoomScreen(),
             ),
         AppRoutes.addMapping: (context) => RoleProtected(
               allowedRoles: {'admin'},

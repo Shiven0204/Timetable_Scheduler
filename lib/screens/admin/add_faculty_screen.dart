@@ -6,13 +6,18 @@ import 'package:timetable_scheduler/utils/short_name_generator.dart';
 import 'package:timetable_scheduler/widgets/institute_form_card.dart';
 
 class AddFacultyScreen extends StatefulWidget {
-  const AddFacultyScreen({super.key});
+  const AddFacultyScreen({
+    this.embeddedInDialog = false,
+    super.key,
+  });
+
+  final bool embeddedInDialog;
 
   @override
-  State<AddFacultyScreen> createState() => _AddFacultyScreenState();
+  State<AddFacultyScreen> createState() => AddFacultyScreenState();
 }
 
-class _AddFacultyScreenState extends State<AddFacultyScreen> {
+class AddFacultyScreenState extends State<AddFacultyScreen> {
   final _fullNameController = TextEditingController();
   final _shortNameController = TextEditingController();
   final _maxLecturesController = TextEditingController(text: '4');
@@ -76,28 +81,28 @@ class _AddFacultyScreenState extends State<AddFacultyScreen> {
     super.dispose();
   }
 
-  Future<void> _onSave() async {
+  Future<bool> submit() async {
     final fullName = _fullNameController.text.trim();
     final shortName = _shortNameController.text.trim().toUpperCase();
     final maxText = _maxLecturesController.text.trim();
 
     if (fullName.isEmpty) {
       _showSnack('Full name is required');
-      return;
+      return false;
     }
     if (shortName.isEmpty) {
       _showSnack('Short name is required');
-      return;
+      return false;
     }
     if (_selectedDepartmentId == null) {
       _showSnack('Department is required');
-      return;
+      return false;
     }
 
     final maxLectures = int.tryParse(maxText);
     if (maxLectures == null || maxLectures <= 0) {
       _showSnack('Enter a valid max lectures per day (greater than 0)');
-      return;
+      return false;
     }
 
     setState(() => _saving = true);
@@ -113,12 +118,16 @@ class _AddFacultyScreenState extends State<AddFacultyScreen> {
         designation: _designationController.text.trim(),
         departmentId: _selectedDepartmentId!,
       );
-      if (!mounted) return;
-      _showSnack('Faculty saved');
+      if (!mounted) return false;
+      if (!widget.embeddedInDialog) {
+        _showSnack('Faculty saved');
+      }
       _clearForm();
+      return true;
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return false;
       _showSnack('Error: $e');
+      return false;
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -144,9 +153,158 @@ class _AddFacultyScreenState extends State<AddFacultyScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  Widget _buildForm() {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InstituteFormCard(
+          title: 'Main details',
+          subtitle: 'Workload and availability',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _fullNameController,
+                textCapitalization: TextCapitalization.words,
+                decoration: instituteInputDecoration('Full Name *'),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: _shortNameController,
+                textCapitalization: TextCapitalization.characters,
+                onChanged: (_) => _shortNameEdited = true,
+                decoration: instituteInputDecoration(
+                  'Short Name *',
+                  hint: 'Auto-generated, editable',
+                ),
+              ),
+              const SizedBox(height: 16),
+              InputDecorator(
+                decoration: instituteInputDecoration('Department *'),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: _selectedDepartmentId,
+                    hint: const Text('Select department'),
+                    items: _departments.map((d) {
+                      return DropdownMenuItem<String>(
+                        value: d['id'] as String,
+                        child: Text(d['name'].toString()),
+                      );
+                    }).toList(),
+                    onChanged: (value) =>
+                        setState(() => _selectedDepartmentId = value),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                'Max lecture configuration',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: scheme.onSurface,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: _maxLecturesController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: instituteInputDecoration(
+                  'Max Lectures per Day *',
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Preferred availability',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                children: _availabilityOptions.entries.map((entry) {
+                  final selected = _availability == entry.key;
+                  return ChoiceChip(
+                    label: Text(entry.value),
+                    selected: selected,
+                    onSelected: (_) {
+                      setState(() => _availability = entry.key);
+                    },
+                  );
+                }).toList(),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Theme(
+            data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+            child: ExpansionTile(
+              initiallyExpanded: _additionalExpanded,
+              onExpansionChanged: (v) => setState(() => _additionalExpanded = v),
+              title: const Text(
+                'Additional details',
+                style: TextStyle(fontWeight: FontWeight.w700),
+              ),
+              subtitle: const Text(
+                'Optional — email, role, phone, designation',
+                style: TextStyle(fontSize: 12),
+              ),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Column(
+                    children: [
+                      TextField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: instituteInputDecoration('Email'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _roleController,
+                        decoration: instituteInputDecoration(
+                          'Role',
+                          hint: 'e.g. Professor',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _phoneController,
+                        keyboardType: TextInputType.phone,
+                        decoration: instituteInputDecoration('Phone number'),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: _designationController,
+                        decoration: instituteInputDecoration('Designation'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    if (widget.embeddedInDialog) {
+      return _buildForm();
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Add Faculty')),
@@ -155,157 +313,19 @@ class _AddFacultyScreenState extends State<AddFacultyScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            InstituteFormCard(
-              title: 'Main details',
-              subtitle: 'Workload and availability',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  TextField(
-                    controller: _fullNameController,
-                    textCapitalization: TextCapitalization.words,
-                    decoration: instituteInputDecoration('Full Name *'),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _shortNameController,
-                    textCapitalization: TextCapitalization.characters,
-                    onChanged: (_) => _shortNameEdited = true,
-                    decoration: instituteInputDecoration(
-                      'Short Name *',
-                      hint: 'Auto-generated, editable',
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Text(
-                    'Max lecture configuration',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: scheme.onSurface,
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  TextField(
-                    controller: _maxLecturesController,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                    decoration: instituteInputDecoration(
-                      'Max lectures per day *',
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Preferred availability',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: _availabilityOptions.entries.map((entry) {
-                      final selected = _availability == entry.key;
-                      return ChoiceChip(
-                        label: Text(entry.value),
-                        selected: selected,
-                        onSelected: (_) {
-                          setState(() => _availability = entry.key);
-                        },
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 16),
-                  InputDecorator(
-                    decoration: instituteInputDecoration('Department *'),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: _selectedDepartmentId,
-                        hint: const Text('Select department'),
-                        items: _departments.map((d) {
-                          return DropdownMenuItem<String>(
-                            value: d['id'] as String,
-                            child: Text(d['name'].toString()),
-                          );
-                        }).toList(),
-                        onChanged: (value) =>
-                            setState(() => _selectedDepartmentId = value),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(18),
-              ),
-              child: Theme(
-                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-                child: ExpansionTile(
-                  initiallyExpanded: _additionalExpanded,
-                  onExpansionChanged: (v) =>
-                      setState(() => _additionalExpanded = v),
-                  title: const Text(
-                    'Additional details',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  subtitle: const Text(
-                    'Optional — email, role, phone, designation',
-                    style: TextStyle(fontSize: 12),
-                  ),
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: Column(
-                        children: [
-                          TextField(
-                            controller: _emailController,
-                            keyboardType: TextInputType.emailAddress,
-                            decoration: instituteInputDecoration('Email'),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _roleController,
-                            decoration: instituteInputDecoration(
-                              'Role',
-                              hint: 'e.g. Professor',
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _phoneController,
-                            keyboardType: TextInputType.phone,
-                            decoration: instituteInputDecoration('Phone number'),
-                          ),
-                          const SizedBox(height: 12),
-                          TextField(
-                            controller: _designationController,
-                            decoration: instituteInputDecoration('Designation'),
-                          ),
-                          // Department is required and configured in main details.
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            _buildForm(),
             const SizedBox(height: 24),
             SizedBox(
               height: 48,
               child: FilledButton(
-                onPressed: _saving ? null : _onSave,
+                onPressed: _saving ? null : submit,
                 child: _saving
                     ? const SizedBox(
                         height: 22,
                         width: 22,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Save faculty'),
+                    : const Text('NEXT'),
               ),
             ),
           ],

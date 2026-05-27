@@ -4,11 +4,7 @@ class AppRoutes {
   static const overview = '/overview';
   static const basicInformation = '/basic-information';
   static const timetableConfig = '/timetable-config';
-  static const addDepartment = '/add_department';
-  static const addProgram = '/add_program';
-  static const addFaculty = '/add_faculty';
   static const addSubject = '/add_subject';
-  static const addRoom = '/add_room';
   static const addMapping = '/add-mapping';
   static const viewTimetable = '/view-timetable';
   static const facultySchedule = '/faculty-schedule';

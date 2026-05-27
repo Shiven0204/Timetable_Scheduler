@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:timetable_scheduler/routes/app_routes.dart';
+import 'package:timetable_scheduler/screens/admin/institute_data_entries.dart';
 
 class InstituteDataScreen extends StatelessWidget {
   const InstituteDataScreen({super.key});
@@ -27,14 +27,43 @@ class InstituteDataScreen extends StatelessWidget {
                   color: primaryColor,
                 ),
               ),
+              const SizedBox(height: 8),
+              Text(
+                'Tap a card to open a quick-entry form',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
               const SizedBox(height: 18),
-              _tile(context, 'Department', Icons.account_tree, AppRoutes.addDepartment),
+              _tile(
+                context,
+                'Department',
+                Icons.account_tree,
+                InstituteDataEntries.openDepartment,
+              ),
               const SizedBox(height: 14),
-              _tile(context, 'Program', Icons.school, AppRoutes.addProgram),
+              _tile(
+                context,
+                'Program',
+                Icons.school,
+                InstituteDataEntries.openProgram,
+              ),
               const SizedBox(height: 14),
-              _tile(context, 'Faculty', Icons.person, AppRoutes.addFaculty),
+              _tile(
+                context,
+                'Faculty',
+                Icons.person,
+                InstituteDataEntries.openFaculty,
+              ),
               const SizedBox(height: 14),
-              _tile(context, 'Room', Icons.meeting_room, AppRoutes.addRoom),
+              _tile(
+                context,
+                'Room',
+                Icons.meeting_room,
+                InstituteDataEntries.openRoom,
+              ),
             ],
           ),
         ),
@@ -46,7 +75,7 @@ class InstituteDataScreen extends StatelessWidget {
     BuildContext context,
     String title,
     IconData icon,
-    String route,
+    Future<void> Function(BuildContext) onTap,
   ) {
     return Card(
       elevation: 0,
@@ -65,7 +94,7 @@ class InstituteDataScreen extends StatelessWidget {
         ),
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
-          onTap: () => Navigator.pushNamed(context, route),
+          onTap: () => onTap(context),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
             child: Row(
@@ -76,10 +105,13 @@ class InstituteDataScreen extends StatelessWidget {
                   child: Text(
                     title,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-                const Icon(Icons.chevron_right),
+                const Icon(Icons.add_circle_outline),
               ],
             ),
           ),
@@ -88,4 +120,3 @@ class InstituteDataScreen extends StatelessWidget {
     );
   }
 }
-
