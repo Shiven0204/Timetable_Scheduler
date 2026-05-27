@@ -28,11 +28,13 @@ class DatabaseService {
     required String name,
     required String shortName,
     int? studentCount,
-    String? departmentId,
+    required String departmentId,
   }) async {
     try {
-      if (name.isEmpty || shortName.isEmpty) {
-        throw Exception('Program name and short name are required');
+      if (name.isEmpty || shortName.isEmpty || departmentId.trim().isEmpty) {
+        throw Exception(
+          'Program name, short name, and department are required',
+        );
       }
 
       final data = <String, dynamic>{
@@ -45,9 +47,7 @@ class DatabaseService {
       if (studentCount != null) {
         data['student_count'] = studentCount;
       }
-      if (departmentId != null && departmentId.trim().isNotEmpty) {
-        data['department_id'] = departmentId.trim();
-      }
+      data['department_id'] = departmentId.trim();
 
       await _db.collection('Programs').add(data);
 

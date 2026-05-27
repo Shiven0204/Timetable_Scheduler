@@ -14,9 +14,9 @@ Administrators configure the institute, map each subject to a faculty member and
 
 - **Firebase Authentication** (email / password): sign-in validation, loading state, mapped error messages; **session persistence** via `authStateChanges()`; **sign out** from the dashboard app bar
 - **Firestore** for institute data and generated timetables
-- Admin dashboard (quick actions: My Timetables, Calendar)
+- Admin dashboard control panel (quick actions: My Timetables, Calendar, Student View, Faculty View)
 - **Basic Information** hub: timetable metadata, academic session, bell schedule, working days, periods & breaks (first config step before generation)
-- Overview hub: data setup, lecture configuration, generate timetable, navigation to views
+- Overview hub: data setup, lecture configuration, and timetable generation
 - **Popup-based institute data** entry (department, program, faculty, room) for faster configuration
 - CRUD-style flows: subjects, rooms, **mappings (theory room + optional lab room)** (plus institute entities above)
 - Timetable configuration (`working_days`, `periods_per_day`, etc.)
@@ -113,16 +113,19 @@ Institute Data uses a **dialog-based configuration UX** — no separate full-scr
 
 Forms reuse the same widgets and `DatabaseService` save logic as before (`add_*_screen.dart` with `embeddedInDialog: true`). Subject and mapping entry remain on their own screens via **Subject & Lecture Configuration**.
 
-- **Dashboard cleanup**: Admin dashboard quick actions now keep only **My Timetables** and **View Calendar**.
+- **Dashboard quick actions**: **My Timetables**, **View Calendar**, **Student View**, and **Faculty View** are directly accessible from dashboard tiles.
+- **Published Timetables**: preview section is shown on dashboard with latest published cards (or empty state).
 - **Institute Data cleanup**: Subject entry is removed from Institute Data shortcuts; use **Subject & Lecture Configuration** instead.
 - **Faculty form**:
   - Required: `full_name`, `short_name`, `department_id`, `max_lectures_per_day`, `availability`
   - Optional (collapsed section): `email`, `role`, `phone`, `designation`
   - `short_name` auto-generates from full name and remains editable.
 - **Program form**:
-  - Required: `name`, `short_name`
+  - Required: `name`, `short_name`, `department_id`
   - Optional: `student_count`
   - `short_name` auto-generates and remains editable.
+- **Mapping filter**:
+  - Department dropdown now filters Program dropdown strictly by `department_id`.
 - **Room form**:
   - Required: `name`, `room_type`, `capacity`
   - Optional: `building_name`
@@ -196,7 +199,6 @@ Overview
   → Basic Information (timetable + bell schedule)
   → Institute Data (department, program, faculty, room — popup sheets + NEXT)
   → Subject & Lecture Configuration (subject, mapping, generate)
-  → View Timetable / Faculty Schedule
   → Generate Timetable
 ```
 

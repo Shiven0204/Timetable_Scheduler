@@ -90,24 +90,6 @@ class _OverviewScreenState extends State<OverviewScreen> {
               ),
               const SizedBox(height: 14),
               _buildNavCard(
-                title: 'View Timetable',
-                icon: Icons.table_chart,
-                color: primaryColor,
-                onTap: () {
-                  Navigator.pushNamed(context, AppRoutes.viewTimetable);
-                },
-              ),
-              const SizedBox(height: 14),
-              _buildNavCard(
-                title: 'Faculty Schedule',
-                icon: Icons.person,
-                color: primaryColor,
-                onTap: () {
-                  Navigator.pushNamed(context, AppRoutes.facultySchedule);
-                },
-              ),
-              const SizedBox(height: 14),
-              _buildNavCard(
                 title: 'Generate Timetable',
                 icon: Icons.auto_fix_high,
                 color: primaryColor,

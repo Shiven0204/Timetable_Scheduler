@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:timetable_scheduler/services/database_service.dart';
 import 'package:timetable_scheduler/utils/short_name_generator.dart';
 import 'package:timetable_scheduler/widgets/institute_form_card.dart';
@@ -25,11 +26,29 @@ class AddProgramScreenState extends State<AddProgramScreen> {
 
   bool _shortNameEdited = false;
   bool _saving = false;
+  String? _selectedDepartmentId;
+  List<Map<String, String>> _departments = [];
 
   @override
   void initState() {
     super.initState();
     _nameController.addListener(_onNameChanged);
+    _loadDepartments();
+  }
+
+  Future<void> _loadDepartments() async {
+    final snap = await FirebaseFirestore.instance.collection('Department').get();
+    if (!mounted) return;
+    setState(() {
+      _departments = snap.docs
+          .map(
+            (d) => {
+              'id': d.id,
+              'name': (d.data()['dept_name'] ?? d.id).toString(),
+            },
+          )
+          .toList();
+    });
   }
 
   void _onNameChanged() {
@@ -63,6 +82,10 @@ class AddProgramScreenState extends State<AddProgramScreen> {
       _showSnack('Short name is required');
       return false;
     }
+    if (_selectedDepartmentId == null || _selectedDepartmentId!.isEmpty) {
+      _showSnack('Department is required');
+      return false;
+    }
 
     int? studentCount;
     if (countText.isNotEmpty) {
@@ -79,6 +102,7 @@ class AddProgramScreenState extends State<AddProgramScreen> {
         name: name,
         shortName: shortName,
         studentCount: studentCount,
+        departmentId: _selectedDepartmentId!,
       );
       if (!mounted) return false;
       if (!widget.embeddedInDialog) {
@@ -87,7 +111,10 @@ class AddProgramScreenState extends State<AddProgramScreen> {
       _nameController.clear();
       _shortNameController.clear();
       _studentCountController.clear();
-      setState(() => _shortNameEdited = false);
+      setState(() {
+        _shortNameEdited = false;
+        _selectedDepartmentId = null;
+      });
       return true;
     } catch (e) {
       if (!mounted) return false;
@@ -125,6 +152,26 @@ class AddProgramScreenState extends State<AddProgramScreen> {
             decoration: instituteInputDecoration(
               'Short Name *',
               hint: 'e.g. CSE',
+            ),
+          ),
+          const SizedBox(height: 16),
+          InputDecorator(
+            decoration: instituteInputDecoration('Department *'),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                isExpanded: true,
+                value: _selectedDepartmentId,
+                hint: const Text('Select department'),
+                items: _departments.map((department) {
+                  return DropdownMenuItem<String>(
+                    value: department['id'],
+                    child: Text(department['name'] ?? ''),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  setState(() => _selectedDepartmentId = value);
+                },
+              ),
             ),
           ),
           const SizedBox(height: 16),
