@@ -6,7 +6,7 @@ Flutter application for **institute timetable management**: master data (departm
 
 ## 1. Project overview
 
-Administrators configure the institute, map each subject to a faculty member and **rooms** (classroom for theory, and when applicable a **separate lab room**), then generate a weekly timetable that respects **credit-based theory counts**, **one weekly 2-period lab block** for combined courses, **daily theory limits**, **faculty availability**, and **room conflicts**. Generated slots are stored in Firestore and shown across dashboard, student, faculty, and calendar screens.
+Administrators configure the institute, map each subject to a faculty member and **rooms** (classroom for theory, and when applicable a **separate lab room**), then generate a weekly timetable that respects configured **theory/lab frequencies**, **continuous lab placement**, **daily theory limits**, **faculty availability**, and **room conflicts**. Generated slots are stored in Firestore and shown across dashboard, student, faculty, and calendar screens.
 
 ---
 
@@ -149,7 +149,7 @@ Forms reuse the same widgets and `DatabaseService` save logic as before (`add_*_
    - **`theoryRoomMap[subjectId]`** from `theory_room_id` (fallback: legacy `room_id`) — room document must have **`room_type == classroom`**
    - **`labRoomMap[subjectId]`** from `lab_room_id` — required when subject has `is_lab == true`; room document must have **`room_type == lab`**
 2. **`createEmptyTimetableGrid()`** — For each program, empty lists per weekday × periods.
-3. **`scheduleLabs()`** — For each subject with `is_lab == true`: place **`lab_frequency`** lab sessions; each session is **one contiguous 2-period block** using `lab_room_id`. The same subject is placed on **different days** (max one lab session/day/subject), while still respecting faculty/room conflicts.
+3. **`scheduleLabs()`** — For each subject with `is_lab == true`: place **`lab_frequency`** lab sessions where each session is **1 period**, and the weekly sessions are placed as one **continuous block** using `lab_room_id` (e.g. `2` credits ⇒ `2` continuous periods), with faculty/room conflict checks.
 4. **`scheduleTheorySubjects()`** — Theory uses **`theory_frequency`** directly (independent of lab credits) and places at most one theory slot/day/subject with classroom + conflict checks.
 5. **`persistNestedTimetableToFirestore()`** — Flattens nested grid to `timetable` documents (replaces previous batch).
 
@@ -173,8 +173,8 @@ Entry points: **Overview → Generate Timetable**, or **Timetable Configuration 
 | **Theory once per day** | Same `subject_id` at most **one theory** slot per weekday per program (lab slots on the same day do **not** block theory that day). |
 | **Theory frequency** | Uses mapping `theory_frequency` directly (can be `0`). |
 | **Lab credits** | For `is_lab == true`: **1 credit = 1 lab session/week**. |
-| **Lab session length** | Every lab session occupies **2 continuous periods**. |
-| **Lab distribution** | A subject can have **max one lab session per day**; higher `lab_frequency` is distributed across days. |
+| **Lab session length** | Every lab session occupies **1 period**. |
+| **Lab continuity** | `lab_frequency` sessions for a subject are placed continuously (e.g. `2` credits = `2` continuous periods). |
 | **Rooms from mapping** | No random room pick: theory always uses **`theory_room_id`**; lab uses **`lab_room_id`**. |
 | **Faculty conflicts** | Same faculty cannot be double-booked in the same day/period. |
 | **Room conflicts** | Same room cannot be used twice in the same day/period. |

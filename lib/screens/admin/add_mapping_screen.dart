@@ -448,7 +448,7 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
                 const SizedBox(height: 8),
                 Text(
                   isLabCourse
-                      ? 'Lab subjects can be lab-only or lab + theory. Set theory/lab frequencies independently.'
+                      ? 'Lab subjects can be lab-only or lab + theory. Each lab session is 1 period; frequencies are independent.'
                       : 'Theory-only subject: pick a classroom and keep lab frequency at 0.',
                   textAlign: TextAlign.center,
                   style: TextStyle(

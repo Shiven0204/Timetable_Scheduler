@@ -205,30 +205,25 @@ class TimetableService {
             );
             continue;
           }
-          final placedDays = <String>[];
-          var blocksPlaced = 0;
-          while (blocksPlaced < blocksNeeded) {
-            final placed = _tryPlaceLabForProgram(
-              programGrid: programGrid,
-              orderedDays: orderedDays,
-              subjectId: subjectId,
-              facultyId: facultyId,
-              roomId: mappedLabRoomId,
-              facultySchedule: facultySchedule,
-              roomSchedule: roomSchedule,
-              usedDays: placedDays,
+          final placed = _tryPlaceLabForProgram(
+            programGrid: programGrid,
+            orderedDays: orderedDays,
+            subjectId: subjectId,
+            facultyId: facultyId,
+            roomId: mappedLabRoomId,
+            facultySchedule: facultySchedule,
+            roomSchedule: roomSchedule,
+            blockLength: blocksNeeded,
+          );
+          final blocksPlaced = placed ? blocksNeeded : 0;
+          if (!placed) {
+            dev.log(
+              'Could not place continuous lab block for subject $subjectId in program $programId. Needed: $blocksNeeded periods',
+              name: 'TimetableService',
             );
-            if (!placed) {
-              dev.log(
-                'Could not place all lab blocks for subject $subjectId in program $programId. Remaining: ${blocksNeeded - blocksPlaced}',
-                name: 'TimetableService',
-              );
-              break;
-            }
-            blocksPlaced++;
           }
           dev.log(
-            'Lab distribution => program=$programId subject=$subjectId frequency=$blocksNeeded placed=$blocksPlaced days=$placedDays',
+            'Lab placement => program=$programId subject=$subjectId sessions=$blocksNeeded placed=$blocksPlaced',
             name: 'TimetableService',
           );
         }
@@ -746,16 +741,14 @@ class TimetableService {
     if (facultyId.isEmpty) return false;
 
     for (var day = 0; day < days; day++) {
-      for (var period = 0; period < periods - 1; period++) {
-        if (!grid[day]![period].isEmpty || !grid[day]![period + 1].isEmpty) {
+      for (var period = 0; period < periods; period++) {
+        if (!grid[day]![period].isEmpty) {
           continue;
         }
-        if (_isBusy(facultySchedule, facultyId, day, period) ||
-            _isBusy(facultySchedule, facultyId, day, period + 1)) {
+        if (_isBusy(facultySchedule, facultyId, day, period)) {
           continue;
         }
-        if (_isBusy(roomSchedule, roomId, day, period) ||
-            _isBusy(roomSchedule, roomId, day, period + 1)) {
+        if (_isBusy(roomSchedule, roomId, day, period)) {
           continue;
         }
 
@@ -765,17 +758,9 @@ class TimetableService {
           roomId: roomId,
           type: 'lab',
         );
-        grid[day]![period + 1] = _Slot(
-          subjectId: task.subjectId,
-          facultyId: facultyId,
-          roomId: roomId,
-          type: 'lab',
-        );
 
         _markBusy(facultySchedule, facultyId, day, period);
-        _markBusy(facultySchedule, facultyId, day, period + 1);
         _markBusy(roomSchedule, roomId, day, period);
-        _markBusy(roomSchedule, roomId, day, period + 1);
         return true;
       }
     }
@@ -1021,27 +1006,29 @@ class TimetableService {
     required String roomId,
     required Map<String, Map<String, Set<int>>> facultySchedule,
     required Map<String, Map<String, Set<int>>> roomSchedule,
-    required List<String> usedDays,
+    required int blockLength,
   }) {
+    if (blockLength <= 0) {
+      return false;
+    }
     for (final day in orderedDays) {
-      if (usedDays.contains(day)) {
-        continue;
-      }
       final slots = (programGrid[day] as List<dynamic>? ?? []);
-      if (slots.length < 2) {
+      if (slots.length < blockLength) {
         continue;
       }
 
-      for (var period = 0; period < slots.length - 1; period++) {
-        if (slots[period] != null || slots[period + 1] != null) {
-          continue;
+      for (var start = 0; start <= slots.length - blockLength; start++) {
+        var canPlace = true;
+        for (var offset = 0; offset < blockLength; offset++) {
+          final period = start + offset;
+          if (slots[period] != null ||
+              _isConflict(facultySchedule, facultyId, day, period) ||
+              _isConflict(roomSchedule, roomId, day, period)) {
+            canPlace = false;
+            break;
+          }
         }
-        if (_isConflict(facultySchedule, facultyId, day, period) ||
-            _isConflict(facultySchedule, facultyId, day, period + 1)) {
-          continue;
-        }
-        if (_isConflict(roomSchedule, roomId, day, period) ||
-            _isConflict(roomSchedule, roomId, day, period + 1)) {
+        if (!canPlace) {
           continue;
         }
 
@@ -1051,15 +1038,12 @@ class TimetableService {
           'room_id': roomId,
           'type': 'lab',
         };
-
-        slots[period] = Map<String, dynamic>.from(labSlot);
-        slots[period + 1] = Map<String, dynamic>.from(labSlot);
-
-        _markStringSchedule(facultySchedule, facultyId, day, period);
-        _markStringSchedule(facultySchedule, facultyId, day, period + 1);
-        _markStringSchedule(roomSchedule, roomId, day, period);
-        _markStringSchedule(roomSchedule, roomId, day, period + 1);
-        usedDays.add(day);
+        for (var offset = 0; offset < blockLength; offset++) {
+          final period = start + offset;
+          slots[period] = Map<String, dynamic>.from(labSlot);
+          _markStringSchedule(facultySchedule, facultyId, day, period);
+          _markStringSchedule(roomSchedule, roomId, day, period);
+        }
         return true;
       }
     }
