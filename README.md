@@ -149,10 +149,8 @@ Forms reuse the same widgets and `DatabaseService` save logic as before (`add_*_
    - **`theoryRoomMap[subjectId]`** from `theory_room_id` (fallback: legacy `room_id`) — room document must have **`room_type == classroom`**
    - **`labRoomMap[subjectId]`** from `lab_room_id` — required when subject has `is_lab == true`; room document must have **`room_type == lab`**
 2. **`createEmptyTimetableGrid()`** — For each program, empty lists per weekday × periods.
-3. **`scheduleLabs()`** — For each subject with **`is_lab == true`**: place **one** contiguous **2-period** block using **`lab_room_id`**, respecting faculty/room occupancy.
-4. **`scheduleTheorySubjects()`** — For **every** subject that has theory periods this week (including `is_lab == true` courses): place **`theoryPeriodsPerWeek`** slots using **`theory_room_id`**, at most **one theory slot per subject per day**, respecting conflicts. Theory period count:
-   - `is_lab == false` → **all** `credits` are theory lectures.
-   - `is_lab == true` → **`credits - 1`** theory lectures **plus** the single lab block above (e.g. 4 credits → 3 theory + 1 lab session).
+3. **`scheduleLabs()`** — For each subject with `is_lab == true`: place **`lab_frequency`** lab sessions; each session is **one contiguous 2-period block** using `lab_room_id`. The same subject is placed on **different days** (max one lab session/day/subject), while still respecting faculty/room conflicts.
+4. **`scheduleTheorySubjects()`** — Theory uses **`theory_frequency`** directly (independent of lab credits) and places at most one theory slot/day/subject with classroom + conflict checks.
 5. **`persistNestedTimetableToFirestore()`** — Flattens nested grid to `timetable` documents (replaces previous batch).
 
 Entry points: **Overview → Generate Timetable**, or **Timetable Configuration → Generate Full Timetable** (same pipeline; optional `persistToFirestore` flag in code).
@@ -165,16 +163,18 @@ Entry points: **Overview → Generate Timetable**, or **Timetable Configuration 
 
 | `is_lab` | Meaning |
 |----------|---------|
-| **`false`** | **Theory-only** subject: all `credits` are weekly theory periods; mapping needs **`theory_room_id`** pointing to a room with **`room_type: classroom`** only. |
-| **`true`** | **Theory + lab** subject: **not** “lab only”. It has **`credits - 1`** weekly **theory** periods **and** **one** weekly **lab** session (exactly **two contiguous periods**). Mapping needs **`theory_room_id`** (classroom) **and** **`lab_room_id`** (lab). |
+| **`false`** | Theory-only subject. `lab_frequency` must be `0`. |
+| **`true`** | Lab-enabled subject. Supports **lab-only** (`theory_frequency = 0`) or **lab + theory**. |
 
 ### Other rules
 
 | Rule | Description |
 |------|-------------|
 | **Theory once per day** | Same `subject_id` at most **one theory** slot per weekday per program (lab slots on the same day do **not** block theory that day). |
-| **Theory credits** | See table above: theory-only uses all credits; theory+lab uses `credits - 1` for theory. |
-| **Lab block** | For `is_lab == true`: **one** placement of **two adjacent periods** per week; uses **`lab_room_id`**. |
+| **Theory frequency** | Uses mapping `theory_frequency` directly (can be `0`). |
+| **Lab credits** | For `is_lab == true`: **1 credit = 1 lab session/week**. |
+| **Lab session length** | Every lab session occupies **2 continuous periods**. |
+| **Lab distribution** | A subject can have **max one lab session per day**; higher `lab_frequency` is distributed across days. |
 | **Rooms from mapping** | No random room pick: theory always uses **`theory_room_id`**; lab uses **`lab_room_id`**. |
 | **Faculty conflicts** | Same faculty cannot be double-booked in the same day/period. |
 | **Room conflicts** | Same room cannot be used twice in the same day/period. |

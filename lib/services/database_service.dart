@@ -158,28 +158,38 @@ class DatabaseService {
     required String facultyId,
     required String subjectId,
     required String programId,
-    required String theoryRoomId,
+    String? theoryRoomId,
     String? labRoomId,
     required String departmentId,
     required int theoryFrequency,
     int? labFrequency,
   }) async {
     try {
+      if (theoryFrequency < 0) {
+        throw Exception('Theory frequency cannot be negative');
+      }
+      if ((labFrequency ?? 0) < 0) {
+        throw Exception('Lab frequency cannot be negative');
+      }
+      if (theoryFrequency > 0 &&
+          (theoryRoomId == null || theoryRoomId.trim().isEmpty)) {
+        throw Exception('Theory room is required when theory frequency is greater than 0');
+      }
       final data = <String, dynamic>{
         'faculty_id': facultyId,
         'subject_id': subjectId,
         'program_id': programId,
-        'theory_room_id': theoryRoomId,
-        'room_id': theoryRoomId,
         'theory_frequency': theoryFrequency,
         'created_at': FieldValue.serverTimestamp(),
       };
+      if (theoryRoomId != null && theoryRoomId.trim().isNotEmpty) {
+        data['theory_room_id'] = theoryRoomId.trim();
+        data['room_id'] = theoryRoomId.trim();
+      }
       if (labRoomId != null && labRoomId.trim().isNotEmpty) {
         data['lab_room_id'] = labRoomId.trim();
       }
-      if (labFrequency != null) {
-        data['lab_frequency'] = labFrequency;
-      }
+      data['lab_frequency'] = (labFrequency ?? 0);
       data['department_id'] = departmentId.trim();
       await _db.collection('Mappings').add(data);
 

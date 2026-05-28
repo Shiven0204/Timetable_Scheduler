@@ -197,7 +197,15 @@ class TimetableService {
             continue;
           }
 
-          final blocksNeeded = (labFrequencyMap[subjectId] ?? 1).clamp(1, 10);
+          final blocksNeeded = (labFrequencyMap[subjectId] ?? 0).clamp(0, 10);
+          if (blocksNeeded <= 0) {
+            dev.log(
+              'Lab $subjectId skipped: lab_frequency resolved to 0',
+              name: 'TimetableService',
+            );
+            continue;
+          }
+          final placedDays = <String>[];
           var blocksPlaced = 0;
           while (blocksPlaced < blocksNeeded) {
             final placed = _tryPlaceLabForProgram(
@@ -208,6 +216,7 @@ class TimetableService {
               roomId: mappedLabRoomId,
               facultySchedule: facultySchedule,
               roomSchedule: roomSchedule,
+              usedDays: placedDays,
             );
             if (!placed) {
               dev.log(
@@ -218,6 +227,10 @@ class TimetableService {
             }
             blocksPlaced++;
           }
+          dev.log(
+            'Lab distribution => program=$programId subject=$subjectId frequency=$blocksNeeded placed=$blocksPlaced days=$placedDays',
+            name: 'TimetableService',
+          );
         }
       }
 
@@ -289,12 +302,11 @@ class TimetableService {
             continue;
           }
 
-          final credits = (subject['credits'] as num?)?.toInt() ?? 0;
-          final isLabCourse = subject['is_lab'] == true;
-          final override = theoryFrequencyMap[subjectId];
-          final lecturesTarget = (override != null && override > 0)
-              ? override
-              : _theoryPeriodsPerWeek(credits: credits, isLabCourse: isLabCourse);
+          final lecturesTarget = theoryFrequencyMap[subjectId] ?? 0;
+          dev.log(
+            'Theory frequency => program=$programId subject=$subjectId value=$lecturesTarget',
+            name: 'TimetableService',
+          );
           if (lecturesTarget <= 0) {
             continue;
           }
@@ -494,34 +506,45 @@ class TimetableService {
               .toString()
               .trim();
           final labRoomId = (row['lab_room_id'] ?? '').toString().trim();
-          final theoryFrequency =
-              (row['theory_frequency'] as num?)?.toInt() ??
-                  (row['theoryFrequency'] as num?)?.toInt();
-          final labFrequency =
-              (row['lab_frequency'] as num?)?.toInt() ??
-                  (row['labFrequency'] as num?)?.toInt();
+          final theoryFrequency = _normalizedTheoryFrequency(
+            rawTheoryFrequency:
+                (row['theory_frequency'] as num?)?.toInt() ??
+                    (row['theoryFrequency'] as num?)?.toInt(),
+            isLabCourse: isLabCourse,
+            credits: (subject['credits'] as num?)?.toInt() ?? 0,
+          );
+          final labFrequency = _normalizedLabFrequency(
+            rawLabFrequency:
+                (row['lab_frequency'] as num?)?.toInt() ??
+                    (row['labFrequency'] as num?)?.toInt(),
+            isLabCourse: isLabCourse,
+            credits: (subject['credits'] as num?)?.toInt() ?? 0,
+          );
 
-          if (theoryRoomId.isEmpty) {
+          if (theoryFrequency > 0 && theoryRoomId.isEmpty) {
             dev.log(
-              'Skipping subject $subjectId: mapping missing theory_room_id (or legacy room_id)',
+              'Skipping subject $subjectId: theory_frequency > 0 but theory room is missing',
               name: 'TimetableService',
             );
             continue;
           }
 
-          final theoryRoomDoc = roomById[theoryRoomId];
-          if (theoryRoomDoc == null || !RoomTypeUtils.isClassroomRoomDoc(theoryRoomDoc)) {
-            dev.log(
-              'Skipping subject $subjectId: theory room missing or not a classroom',
-              name: 'TimetableService',
-            );
-            continue;
+          if (theoryFrequency > 0) {
+            final theoryRoomDoc = roomById[theoryRoomId];
+            if (theoryRoomDoc == null ||
+                !RoomTypeUtils.isClassroomRoomDoc(theoryRoomDoc)) {
+              dev.log(
+                'Skipping subject $subjectId: theory room missing or not a classroom',
+                name: 'TimetableService',
+              );
+              continue;
+            }
           }
 
-          if (isLabCourse) {
+          if (isLabCourse && labFrequency > 0) {
             if (labRoomId.isEmpty) {
               dev.log(
-                'Skipping subject $subjectId: is_lab subject requires lab_room_id in mapping',
+                'Skipping subject $subjectId: lab_frequency > 0 requires lab_room_id in mapping',
                 name: 'TimetableService',
               );
               continue;
@@ -535,17 +558,21 @@ class TimetableService {
               continue;
             }
             labRoomMap[subjectId] = labRoomId;
-            final lf = labFrequency ?? 1;
-            if (lf > 0) {
-              labFrequencyMap[subjectId] = lf;
-            }
+            labFrequencyMap[subjectId] = labFrequency;
           }
 
           facultyMap[subjectId] = facultyId;
-          theoryRoomMap[subjectId] = theoryRoomId;
-          if (theoryFrequency != null && theoryFrequency > 0) {
-            theoryFrequencyMap[subjectId] = theoryFrequency;
+          if (theoryFrequency > 0) {
+            theoryRoomMap[subjectId] = theoryRoomId;
           }
+          theoryFrequencyMap[subjectId] = theoryFrequency;
+          if (!isLabCourse) {
+            labFrequencyMap[subjectId] = 0;
+          }
+          dev.log(
+            'Prepared frequencies => program=$programId subject=$subjectId isLab=$isLabCourse theory=$theoryFrequency lab=${labFrequencyMap[subjectId] ?? 0}',
+            name: 'TimetableService',
+          );
         }
 
         timetableData[programId] = {
@@ -986,18 +1013,6 @@ class TimetableService {
     dev.log('-------------------------------', name: 'TimetableService');
   }
 
-  /// Weekly theory periods: all credits when not a lab course; when `is_lab`
-  /// is true, one credit is reserved for the single 2-period lab block.
-  int _theoryPeriodsPerWeek({required int credits, required bool isLabCourse}) {
-    if (credits <= 0) {
-      return 0;
-    }
-    if (!isLabCourse) {
-      return credits;
-    }
-    return credits - 1;
-  }
-
   bool _tryPlaceLabForProgram({
     required Map<String, dynamic> programGrid,
     required List<String> orderedDays,
@@ -1006,8 +1021,12 @@ class TimetableService {
     required String roomId,
     required Map<String, Map<String, Set<int>>> facultySchedule,
     required Map<String, Map<String, Set<int>>> roomSchedule,
+    required List<String> usedDays,
   }) {
     for (final day in orderedDays) {
+      if (usedDays.contains(day)) {
+        continue;
+      }
       final slots = (programGrid[day] as List<dynamic>? ?? []);
       if (slots.length < 2) {
         continue;
@@ -1040,10 +1059,39 @@ class TimetableService {
         _markStringSchedule(facultySchedule, facultyId, day, period + 1);
         _markStringSchedule(roomSchedule, roomId, day, period);
         _markStringSchedule(roomSchedule, roomId, day, period + 1);
+        usedDays.add(day);
         return true;
       }
     }
     return false;
+  }
+
+  int _normalizedTheoryFrequency({
+    required int? rawTheoryFrequency,
+    required bool isLabCourse,
+    required int credits,
+  }) {
+    if (rawTheoryFrequency != null) {
+      return rawTheoryFrequency < 0 ? 0 : rawTheoryFrequency;
+    }
+    if (isLabCourse) {
+      return 0;
+    }
+    return credits < 0 ? 0 : credits;
+  }
+
+  int _normalizedLabFrequency({
+    required int? rawLabFrequency,
+    required bool isLabCourse,
+    required int credits,
+  }) {
+    if (!isLabCourse) {
+      return 0;
+    }
+    if (rawLabFrequency != null) {
+      return rawLabFrequency < 0 ? 0 : rawLabFrequency;
+    }
+    return credits < 0 ? 0 : credits;
   }
 
   bool _isConflict(

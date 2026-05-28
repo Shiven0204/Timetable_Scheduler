@@ -7,10 +7,12 @@ extension _FirstOrNullExt<T> on Iterable<T> {
   T? get firstOrNull => isEmpty ? null : first;
 }
 
-/// Maps each subject (per program) to faculty + **theory** room (`room_type: classroom`) + optional **lab** room (`room_type: lab`).
+/// Maps each subject (per program) to faculty + frequency + room(s).
 ///
-/// When `is_lab` is true on the subject, it means **theory + one weekly lab block** (not lab-only):
-/// pick a classroom for theory and a lab room for the 2-period lab session.
+/// For lab-enabled subjects:
+/// - theory and lab frequencies are independent
+/// - theory can be 0 (lab-only)
+/// - each lab frequency unit schedules one 2-period continuous lab block
 class AddMappingScreen extends StatefulWidget {
   const AddMappingScreen({super.key});
 
@@ -27,7 +29,7 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
   String? _selectedFacultyId;
   String? _selectedTheoryRoomId;
   String? _selectedLabRoomId;
-  int _theoryFrequency = 1;
+  int _theoryFrequency = 0;
   int _labFrequency = 1;
 
   List<Map<String, dynamic>> _departments = [];
@@ -197,7 +199,7 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
       _selectedFacultyId = null;
       _selectedTheoryRoomId = null;
       _selectedLabRoomId = null;
-      _theoryFrequency = 1;
+      _theoryFrequency = 0;
       _labFrequency = 1;
     });
   }
@@ -222,11 +224,11 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
     final isLabCourse = subject['is_lab'] == true;
     setState(() {
       if (!isLabCourse) {
-        _theoryFrequency = credits > 0 ? credits : 1;
+        _theoryFrequency = credits > 0 ? credits : 0;
         _labFrequency = 0;
       } else {
-        _theoryFrequency = credits > 1 ? credits - 1 : 1;
-        _labFrequency = 1;
+        _theoryFrequency = 0;
+        _labFrequency = credits > 0 ? credits : 0;
       }
     });
   }
@@ -235,12 +237,11 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
     if (_selectedDepartmentId == null ||
         _selectedProgramId == null ||
         _selectedSubjectId == null ||
-        _selectedFacultyId == null ||
-        _selectedTheoryRoomId == null) {
+        _selectedFacultyId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Select department, program, subject, faculty, and theory room',
+            'Select department, program, subject, and faculty',
           ),
         ),
       );
@@ -249,33 +250,52 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
 
     final sub = _currentSubject;
     final isLabCourse = sub?['is_lab'] == true;
-    if (_theoryFrequency <= 0) {
+    if (_theoryFrequency < 0) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Theory frequency must be at least 1')),
+        const SnackBar(content: Text('Theory frequency cannot be negative')),
       );
       return;
     }
 
     if (isLabCourse) {
-      if (_selectedLabRoomId == null || _selectedLabRoomId!.isEmpty) {
+      if (_labFrequency < 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'This subject includes a lab: select a lab room as well.',
+              'Lab frequency cannot be negative',
             ),
           ),
         );
         return;
       }
-      if (_labFrequency <= 0) {
+      if (_labFrequency > 0 &&
+          (_selectedLabRoomId == null || _selectedLabRoomId!.isEmpty)) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Lab frequency must be at least 1')),
+          const SnackBar(
+            content: Text('Select a lab room when lab frequency is greater than 0'),
+          ),
         );
         return;
       }
     }
 
-    if (_classroomRooms.isEmpty) {
+    if (!isLabCourse && _labFrequency != 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Lab frequency must be 0 for non-lab subjects'),
+        ),
+      );
+      return;
+    }
+
+    if (_theoryFrequency > 0 && _selectedTheoryRoomId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select a theory classroom for theory frequency')),
+      );
+      return;
+    }
+
+    if (_theoryFrequency > 0 && _classroomRooms.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -286,7 +306,7 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
       return;
     }
 
-    if (isLabCourse && _labRoomsOnly.isEmpty) {
+    if (isLabCourse && _labFrequency > 0 && _labRoomsOnly.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -311,11 +331,11 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
         facultyId: _selectedFacultyId!,
         subjectId: _selectedSubjectId!,
         programId: _selectedProgramId!,
-        theoryRoomId: _selectedTheoryRoomId!,
+        theoryRoomId: _selectedTheoryRoomId,
         labRoomId: isLabCourse ? _selectedLabRoomId : null,
         departmentId: deptId,
         theoryFrequency: _theoryFrequency,
-        labFrequency: isLabCourse ? _labFrequency : null,
+        labFrequency: isLabCourse ? _labFrequency : 0,
       );
 
       if (!mounted) return;
@@ -329,7 +349,7 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
         _selectedFacultyId = null;
         _selectedTheoryRoomId = null;
         _selectedLabRoomId = null;
-        _theoryFrequency = 1;
+        _theoryFrequency = 0;
         _labFrequency = 1;
       });
     } catch (e) {
@@ -428,8 +448,8 @@ class _AddMappingScreenState extends State<AddMappingScreen> {
                 const SizedBox(height: 8),
                 Text(
                   isLabCourse
-                      ? 'This subject has theory lectures and one weekly lab block. Pick a classroom and a lab room.'
-                      : 'Theory-only subject: pick a classroom.',
+                      ? 'Lab subjects can be lab-only or lab + theory. Set theory/lab frequencies independently.'
+                      : 'Theory-only subject: pick a classroom and keep lab frequency at 0.',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
@@ -568,7 +588,7 @@ class _FrequencyCard extends StatelessWidget {
             _StepperRow(
               label: 'Theory',
               value: theoryFrequency,
-              min: 1,
+              min: 0,
               onChanged: onTheoryChanged,
             ),
             if (isLabCourse) ...[
@@ -576,7 +596,7 @@ class _FrequencyCard extends StatelessWidget {
               _StepperRow(
                 label: 'Lab',
                 value: labFrequency,
-                min: 1,
+                min: 0,
                 onChanged: onLabChanged,
               ),
             ],
