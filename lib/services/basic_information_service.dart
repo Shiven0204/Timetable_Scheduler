@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
+import 'package:timetable_scheduler/models/academic_session.dart';
 import 'package:timetable_scheduler/models/basic_information.dart';
 import 'package:timetable_scheduler/models/schedule_slot.dart';
 
@@ -82,11 +83,16 @@ class BasicInformationService {
     return null;
   }
 
-  /// Full form validation before save.
-  static String? validate(BasicInformation info) {
+  /// Timetable Details popup validation.
+  static String? validateTimetableDetails(BasicInformation info) {
     if (info.timetableName.trim().isEmpty) {
       return 'Timetable name is required';
     }
+    return _validateAcademicSession(info.academicSession);
+  }
+
+  /// Bell Schedule popup validation.
+  static String? validateBellSchedule(BasicInformation info) {
     if (info.workingDays.isEmpty) {
       return 'Select at least one working day';
     }
@@ -95,7 +101,36 @@ class BasicInformationService {
       return 'Custom cycle weeks must be between 2 and 52';
     }
 
-    final session = info.academicSession;
+    if (info.scheduleMode == ScheduleMode.uniform) {
+      if (info.periods.isEmpty) {
+        return 'Add at least one period';
+      }
+      final err = validateSlots(info.periods, 'Period') ??
+          validateSlots(info.breaks, 'Break');
+      if (err != null) return err;
+    } else {
+      for (final day in info.workingDays) {
+        final ds = info.daySchedules[day] ?? DaySchedule();
+        if (ds.periods.isEmpty) {
+          return 'Add at least one period for $day';
+        }
+        final err = validateSlots(ds.periods, '$day period') ??
+            validateSlots(ds.breaks, '$day break');
+        if (err != null) return err;
+      }
+    }
+
+    return null;
+  }
+
+  /// Full form validation before save.
+  static String? validate(BasicInformation info) {
+    final detailsErr = validateTimetableDetails(info);
+    if (detailsErr != null) return detailsErr;
+    return validateBellSchedule(info);
+  }
+
+  static String? _validateAcademicSession(AcademicSession session) {
     if (session.hasAnyField && !session.isComplete) {
       return 'Complete all academic session fields or leave them empty';
     }
@@ -105,20 +140,6 @@ class BasicInformationService {
         !session.endDate!.isAfter(session.startDate!)) {
       return 'Session end date must be after start date';
     }
-
-    if (info.scheduleMode == ScheduleMode.uniform) {
-      final err = validateSlots(info.periods, 'Period') ??
-          validateSlots(info.breaks, 'Break');
-      if (err != null) return err;
-    } else {
-      for (final day in info.workingDays) {
-        final ds = info.daySchedules[day] ?? DaySchedule();
-        final err = validateSlots(ds.periods, '$day period') ??
-            validateSlots(ds.breaks, '$day break');
-        if (err != null) return err;
-      }
-    }
-
     return null;
   }
 }

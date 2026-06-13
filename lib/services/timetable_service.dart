@@ -8,6 +8,9 @@ class TimetableService {
 
   final FirebaseFirestore _db;
 
+  /// Each lab session occupies this many contiguous periods (e.g. P3–P4).
+  static const int periodsPerLabSession = 2;
+
   static const List<String> _programCollections = ['programs', 'Programs'];
   static const List<String> _subjectCollections = ['subjects', 'Subjects'];
   static const List<String> _mappingCollections = ['mappings', 'Mappings'];
@@ -181,6 +184,9 @@ class TimetableService {
           continue;
         }
 
+        final programLabLoad = <String, int>{};
+        var subjectIndex = 0;
+
         for (final subject in labSubjects) {
           final subjectId = (subject['id'] ?? '').toString();
           final facultyId = (facultyMap[subjectId] ?? '').toString();
@@ -197,35 +203,59 @@ class TimetableService {
             continue;
           }
 
-          final blocksNeeded = (labFrequencyMap[subjectId] ?? 0).clamp(0, 10);
-          if (blocksNeeded <= 0) {
+          final sessionCount = (labFrequencyMap[subjectId] ?? 0).clamp(0, 10);
+          if (sessionCount <= 0) {
             dev.log(
               'Lab $subjectId skipped: lab_frequency resolved to 0',
               name: 'TimetableService',
             );
             continue;
           }
-          final placed = _tryPlaceLabForProgram(
-            programGrid: programGrid,
-            orderedDays: orderedDays,
-            subjectId: subjectId,
-            facultyId: facultyId,
-            roomId: mappedLabRoomId,
-            facultySchedule: facultySchedule,
-            roomSchedule: roomSchedule,
-            blockLength: blocksNeeded,
-          );
-          final blocksPlaced = placed ? blocksNeeded : 0;
-          if (!placed) {
-            dev.log(
-              'Could not place continuous lab block for subject $subjectId in program $programId. Needed: $blocksNeeded periods',
-              name: 'TimetableService',
+
+          final usedDaysForSubject = <String>{};
+          final assignedDays = <String>[];
+          var sessionsPlaced = 0;
+
+          for (var session = 0; session < sessionCount; session++) {
+            final dayOrder = _labSessionDayTryOrder(
+              orderedDays: orderedDays,
+              sessionIndex: session,
+              sessionCount: sessionCount,
+              subjectRotation: subjectIndex,
+              usedDaysForSubject: usedDaysForSubject,
+              programLabLoad: programLabLoad,
             );
+
+            final placedDay = _tryPlaceOneLabSession(
+              programGrid: programGrid,
+              dayTryOrder: dayOrder,
+              subjectId: subjectId,
+              facultyId: facultyId,
+              roomId: mappedLabRoomId,
+              facultySchedule: facultySchedule,
+              roomSchedule: roomSchedule,
+              sessionLength: periodsPerLabSession,
+            );
+
+            if (placedDay == null) {
+              dev.log(
+                'Could not place lab session ${session + 1}/$sessionCount for subject $subjectId in program $programId',
+                name: 'TimetableService',
+              );
+              continue;
+            }
+
+            usedDaysForSubject.add(placedDay);
+            assignedDays.add(placedDay);
+            programLabLoad[placedDay] = (programLabLoad[placedDay] ?? 0) + 1;
+            sessionsPlaced++;
           }
+
           dev.log(
-            'Lab placement => program=$programId subject=$subjectId sessions=$blocksNeeded placed=$blocksPlaced',
+            'Lab distribution => program=$programId subject=$subjectId sessions=$sessionCount placed=$sessionsPlaced days=$assignedDays',
             name: 'TimetableService',
           );
+          subjectIndex++;
         }
       }
 
@@ -323,6 +353,7 @@ class TimetableService {
           }
 
           var lecturesNeeded = lecturesTarget;
+          var lecturesPlaced = 0;
           while (lecturesNeeded > 0) {
             final assigned = _tryPlaceOneTheoryLecture(
               programId: programId,
@@ -334,6 +365,7 @@ class TimetableService {
               facultySchedule: facultySchedule,
               roomSchedule: roomSchedule,
               theoryPlacedTracker: theoryPlacedTracker,
+              dayRotationOffset: lecturesPlaced,
             );
 
             if (!assigned) {
@@ -344,6 +376,7 @@ class TimetableService {
               break;
             }
             lecturesNeeded--;
+            lecturesPlaced++;
           }
 
           assignmentStats.putIfAbsent(programId, () => <String, int>{});
@@ -998,28 +1031,106 @@ class TimetableService {
     dev.log('-------------------------------', name: 'TimetableService');
   }
 
-  bool _tryPlaceLabForProgram({
-    required Map<String, dynamic> programGrid,
+  /// Preferred day indices evenly spaced across the week (e.g. Mon/Wed/Fri).
+  List<int> _evenlySpacedDayIndices({
+    required int dayCount,
+    required int sessionCount,
+    required int subjectRotation,
+  }) {
+    if (dayCount <= 0 || sessionCount <= 0) {
+      return const [];
+    }
+    if (sessionCount == 1) {
+      return [(subjectRotation % dayCount)];
+    }
+    return List<int>.generate(sessionCount, (sessionIndex) {
+      final raw = (sessionIndex * (dayCount - 1)) / (sessionCount - 1);
+      return ((raw.round() + subjectRotation) % dayCount);
+    });
+  }
+
+  /// Day try order for one lab session: preferred spaced day first, then least-loaded days.
+  List<String> _labSessionDayTryOrder({
     required List<String> orderedDays,
+    required int sessionIndex,
+    required int sessionCount,
+    required int subjectRotation,
+    required Set<String> usedDaysForSubject,
+    required Map<String, int> programLabLoad,
+  }) {
+    if (orderedDays.isEmpty) {
+      return const [];
+    }
+
+    final preferredIndices = _evenlySpacedDayIndices(
+      dayCount: orderedDays.length,
+      sessionCount: sessionCount,
+      subjectRotation: subjectRotation,
+    );
+    final preferredDay = sessionIndex < preferredIndices.length
+        ? orderedDays[preferredIndices[sessionIndex]]
+        : orderedDays[sessionIndex % orderedDays.length];
+
+    final candidates = List<String>.from(orderedDays)
+      ..sort((a, b) {
+        final aUsed = usedDaysForSubject.contains(a);
+        final bUsed = usedDaysForSubject.contains(b);
+        if (aUsed != bUsed) {
+          return aUsed ? 1 : -1;
+        }
+        final loadCompare =
+            (programLabLoad[a] ?? 0).compareTo(programLabLoad[b] ?? 0);
+        if (loadCompare != 0) {
+          return loadCompare;
+        }
+        if (a == preferredDay) return -1;
+        if (b == preferredDay) return 1;
+        return orderedDays.indexOf(a).compareTo(orderedDays.indexOf(b));
+      });
+
+    return candidates;
+  }
+
+  /// Rotates day order so theory is not always packed into early weekdays.
+  List<String> _rotatedDayOrder(List<String> orderedDays, int rotationOffset) {
+    if (orderedDays.isEmpty || rotationOffset <= 0) {
+      return orderedDays;
+    }
+    final shift = rotationOffset % orderedDays.length;
+    return [
+      ...orderedDays.sublist(shift),
+      ...orderedDays.sublist(0, shift),
+    ];
+  }
+
+  /// Places one lab session (contiguous [sessionLength] periods) on the first viable day.
+  String? _tryPlaceOneLabSession({
+    required Map<String, dynamic> programGrid,
+    required List<String> dayTryOrder,
     required String subjectId,
     required String facultyId,
     required String roomId,
     required Map<String, Map<String, Set<int>>> facultySchedule,
     required Map<String, Map<String, Set<int>>> roomSchedule,
-    required int blockLength,
+    required int sessionLength,
   }) {
-    if (blockLength <= 0) {
-      return false;
+    if (sessionLength <= 0) {
+      return null;
     }
-    for (final day in orderedDays) {
+
+    for (final day in dayTryOrder) {
       final slots = (programGrid[day] as List<dynamic>? ?? []);
-      if (slots.length < blockLength) {
+      if (slots.length < sessionLength) {
         continue;
       }
 
-      for (var start = 0; start <= slots.length - blockLength; start++) {
+      for (var start = 0; start <= slots.length - sessionLength; start++) {
+        if (_subjectHasLabOnDay(slots, subjectId)) {
+          break;
+        }
+
         var canPlace = true;
-        for (var offset = 0; offset < blockLength; offset++) {
+        for (var offset = 0; offset < sessionLength; offset++) {
           final period = start + offset;
           if (slots[period] != null ||
               _isConflict(facultySchedule, facultyId, day, period) ||
@@ -1038,16 +1149,16 @@ class TimetableService {
           'room_id': roomId,
           'type': 'lab',
         };
-        for (var offset = 0; offset < blockLength; offset++) {
+        for (var offset = 0; offset < sessionLength; offset++) {
           final period = start + offset;
           slots[period] = Map<String, dynamic>.from(labSlot);
           _markStringSchedule(facultySchedule, facultyId, day, period);
           _markStringSchedule(roomSchedule, roomId, day, period);
         }
-        return true;
+        return day;
       }
     }
-    return false;
+    return null;
   }
 
   int _normalizedTheoryFrequency({
@@ -1159,8 +1270,11 @@ class TimetableService {
     required Map<String, Map<String, Set<int>>> facultySchedule,
     required Map<String, Map<String, Set<int>>> roomSchedule,
     required Map<String, Map<String, Set<String>>> theoryPlacedTracker,
+    int dayRotationOffset = 0,
   }) {
-    for (final day in orderedDays) {
+    final dayOrder = _rotatedDayOrder(orderedDays, dayRotationOffset);
+
+    for (final day in dayOrder) {
       final slots = (programGrid[day] as List<dynamic>? ?? []);
 
       if (_hasTheoryScheduledForDay(
@@ -1169,6 +1283,7 @@ class TimetableService {
             day,
             subjectId,
           ) ||
+          _subjectHasLabOnDay(slots, subjectId) ||
           _subjectAlreadyPlacedInDay(slots, subjectId)) {
         continue;
       }
@@ -1219,6 +1334,24 @@ class TimetableService {
     tracker.putIfAbsent(programId, () => <String, Set<String>>{});
     tracker[programId]!.putIfAbsent(day, () => <String>{});
     tracker[programId]![day]!.add(sid);
+  }
+
+  bool _subjectHasLabOnDay(List<dynamic> slots, String subjectId) {
+    final target = subjectId.trim();
+    for (final slot in slots) {
+      if (slot is! Map<String, dynamic>) {
+        continue;
+      }
+      final slotType = (slot['type'] ?? '').toString().toLowerCase();
+      if (slotType != 'lab') {
+        continue;
+      }
+      final sid = (slot['subject_id'] ?? '').toString().trim();
+      if (sid == target) {
+        return true;
+      }
+    }
+    return false;
   }
 
   bool _subjectAlreadyPlacedInDay(List<dynamic> slots, String subjectId) {

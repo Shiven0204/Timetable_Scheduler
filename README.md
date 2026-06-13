@@ -89,6 +89,13 @@ Collection name casing may vary (`Programs` vs `programs`); `TimetableService` t
 
 Administrators open **Overview → Basic Information** as the **first configuration step** before institute data, mappings, or generation.
 
+The screen follows the same **popup quick-entry UX** as Institute Data:
+
+1. **Timetable Details** card → bottom sheet (name, description, academic session) → **NEXT** saves and closes
+2. **Bell Schedule** card → bottom sheet (schedule type, working days, periods & breaks) → **NEXT** saves and closes
+
+Firestore structure is unchanged (`timetable_config/basic_information` + engine sync to `config/timetable`).
+
 | Area | Details |
 |------|---------|
 | **Timetable info** | Required name; optional description |
@@ -149,8 +156,8 @@ Forms reuse the same widgets and `DatabaseService` save logic as before (`add_*_
    - **`theoryRoomMap[subjectId]`** from `theory_room_id` (fallback: legacy `room_id`) — room document must have **`room_type == classroom`**
    - **`labRoomMap[subjectId]`** from `lab_room_id` — required when subject has `is_lab == true`; room document must have **`room_type == lab`**
 2. **`createEmptyTimetableGrid()`** — For each program, empty lists per weekday × periods.
-3. **`scheduleLabs()`** — For each subject with `is_lab == true`: place **`lab_frequency`** lab sessions where each session is **1 period**, and the weekly sessions are placed as one **continuous block** using `lab_room_id` (e.g. `2` credits ⇒ `2` continuous periods), with faculty/room conflict checks.
-4. **`scheduleTheorySubjects()`** — Theory uses **`theory_frequency`** directly (independent of lab credits) and places at most one theory slot/day/subject with classroom + conflict checks.
+3. **`scheduleLabs()`** — For each lab subject: place **`lab_frequency`** sessions as **2 contiguous periods** each (e.g. P3–P4), **one session per subject per day**, distributed across spaced working days (Mon/Wed/Fri style). Program-level lab load balancing avoids packing all labs into early weekdays.
+4. **`scheduleTheorySubjects()`** — Uses **`theory_frequency`** directly. Theory is spread across the week (rotating day order), never on a day that already has a lab for the same subject, and respects faculty/room conflicts.
 5. **`persistNestedTimetableToFirestore()`** — Flattens nested grid to `timetable` documents (replaces previous batch).
 
 Entry points: **Overview → Generate Timetable**, or **Timetable Configuration → Generate Full Timetable** (same pipeline; optional `persistToFirestore` flag in code).
@@ -173,8 +180,10 @@ Entry points: **Overview → Generate Timetable**, or **Timetable Configuration 
 | **Theory once per day** | Same `subject_id` at most **one theory** slot per weekday per program (lab slots on the same day do **not** block theory that day). |
 | **Theory frequency** | Uses mapping `theory_frequency` directly (can be `0`). |
 | **Lab credits** | For `is_lab == true`: **1 credit = 1 lab session/week**. |
-| **Lab session length** | Every lab session occupies **1 period**. |
-| **Lab continuity** | `lab_frequency` sessions for a subject are placed continuously (e.g. `2` credits = `2` continuous periods). |
+| **Lab session length** | Each lab session occupies **2 contiguous periods** (e.g. P3–P4). |
+| **Lab distribution** | **One lab session per subject per day**; multiple sessions spread across the week with spacing (not Mon–Tue–Wed stacking). |
+| **Theory + lab same day** | Same subject does **not** get theory and lab on the same day. |
+| **Theory spread** | Theory uses rotating day order to avoid early-week starvation when labs exist. |
 | **Rooms from mapping** | No random room pick: theory always uses **`theory_room_id`**; lab uses **`lab_room_id`**. |
 | **Faculty conflicts** | Same faculty cannot be double-booked in the same day/period. |
 | **Room conflicts** | Same room cannot be used twice in the same day/period. |
