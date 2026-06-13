@@ -1,11 +1,7 @@
 import 'package:flutter/material.dart';
 
-/// Weekly timetable table: [days] × P1…Pn.
 enum TimetableGridMode {
-  /// Lines: subject, faculty, room.
   programView,
-
-  /// Lines: subject, program, room.
   facultyView,
 }
 
@@ -15,6 +11,7 @@ class TimetableGrid extends StatelessWidget {
     required this.days,
     required this.periodsPerDay,
     required this.grid,
+    this.headers,
     this.mode = TimetableGridMode.programView,
     this.columnWidth = 118,
     this.highlightLabSlots = true,
@@ -23,6 +20,10 @@ class TimetableGrid extends StatelessWidget {
   final List<String> days;
   final int periodsPerDay;
   final Map<String, List<Map<String, dynamic>?>> grid;
+
+  // NEW
+  final List<String>? headers;
+
   final TimetableGridMode mode;
   final double columnWidth;
   final bool highlightLabSlots;
@@ -37,7 +38,10 @@ class TimetableGrid extends StatelessWidget {
       scrollDirection: Axis.horizontal,
       child: Table(
         defaultColumnWidth: FixedColumnWidth(columnWidth),
-        border: TableBorder.all(color: borderColor, width: 1),
+        border: TableBorder.all(
+          color: borderColor,
+          width: 1,
+        ),
         children: [
           TableRow(
             decoration: BoxDecoration(
@@ -45,14 +49,22 @@ class TimetableGrid extends StatelessWidget {
             ),
             children: [
               _headerCell(context, 'Day'),
+
               for (var p = 0; p < periodsPerDay; p++)
-                _headerCell(context, 'P${p + 1}'),
+                _headerCell(
+                  context,
+                  headers != null && p < headers!.length
+                      ? headers![p]
+                      : 'P${p + 1}',
+                ),
             ],
           ),
+
           for (final day in days)
             TableRow(
               children: [
                 _headerCell(context, day),
+
                 for (var p = 0; p < periodsPerDay; p++)
                   _slotCell(context, grid[day]?[p]),
               ],
@@ -83,16 +95,22 @@ class TimetableGrid extends StatelessWidget {
     }
 
     final subjectRaw = (slot['subject'] ?? '').toString().trim();
+
     final line2 = mode == TimetableGridMode.facultyView
         ? (slot['program'] ?? '').toString().trim()
         : (slot['faculty'] ?? '').toString().trim();
+
     final room = (slot['room'] ?? '').toString().trim();
+
     final isLab = highlightLabSlots &&
         (slot['type'] ?? '').toString().toLowerCase() == 'lab';
 
-    final subject = subjectRaw.isNotEmpty && isLab ? '$subjectRaw (LAB)' : subjectRaw;
+    final subject =
+        subjectRaw.isNotEmpty && isLab ? '$subjectRaw (LAB)' : subjectRaw;
 
-    if (subjectRaw.isEmpty && line2.isEmpty && room.isEmpty) {
+    if (subjectRaw.isEmpty &&
+        line2.isEmpty &&
+        room.isEmpty) {
       return _emptySlot(context);
     }
 
@@ -109,8 +127,12 @@ class TimetableGrid extends StatelessWidget {
             textAlign: TextAlign.center,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+            ),
           ),
+
           if (line2.isNotEmpty)
             Text(
               line2,
@@ -122,6 +144,7 @@ class TimetableGrid extends StatelessWidget {
                 color: scheme.onSurfaceVariant,
               ),
             ),
+
           if (room.isNotEmpty)
             Text(
               room,

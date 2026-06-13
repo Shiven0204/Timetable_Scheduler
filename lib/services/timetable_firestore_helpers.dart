@@ -6,21 +6,28 @@ class TimetableFirestoreHelpers {
   TimetableFirestoreHelpers._();
 
   static int? parseDayIndex(Object? dayValue, int dayCount) {
-    final dayIndex = dayValue is num ? dayValue.toInt() : int.tryParse('$dayValue');
+    final dayIndex = dayValue is num
+        ? dayValue.toInt()
+        : int.tryParse('$dayValue');
+
     if (dayIndex == null || dayIndex < 0 || dayIndex >= dayCount) {
       return null;
     }
+
     return dayIndex;
   }
 
   static int? parsePeriodIndex(Object? periodValue, int periodsPerDay) {
-    final periodIndex =
-        periodValue is num ? periodValue.toInt() : int.tryParse('$periodValue');
+    final periodIndex = periodValue is num
+        ? periodValue.toInt()
+        : int.tryParse('$periodValue');
+
     if (periodIndex == null ||
         periodIndex < 0 ||
         periodIndex >= periodsPerDay) {
       return null;
     }
+
     return periodIndex;
   }
 
@@ -43,12 +50,13 @@ class TimetableFirestoreHelpers {
     return true;
   }
 
-  /// Student / calendar: subject, faculty, room + optional `type` (lab/theory).
+  /// Student / Calendar View
   static Map<String, List<Map<String, dynamic>?>> buildProgramViewGrid({
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
     required List<String> orderedDayNames,
     required int periodsPerDay,
     required TimetableResolvedNames names,
+    required List<int> breakIndexes,
   }) {
     final grid = emptyGridForDays(
       orderedDayNames: orderedDayNames,
@@ -57,13 +65,31 @@ class TimetableFirestoreHelpers {
 
     for (final doc in docs) {
       final data = doc.data();
-      final dayIndex = parseDayIndex(data['day'], orderedDayNames.length);
-      final periodIndex = parsePeriodIndex(data['period'], periodsPerDay);
-      if (dayIndex == null || periodIndex == null) {
+
+      final dayIndex =
+          parseDayIndex(data['day'], orderedDayNames.length);
+
+      final parsedPeriodIndex =
+          parsePeriodIndex(data['period'], periodsPerDay);
+
+      if (dayIndex == null || parsedPeriodIndex == null) {
+        continue;
+      }
+
+      int periodIndex = parsedPeriodIndex;
+
+      for (final breakIndex in breakIndexes) {
+        if (periodIndex >= breakIndex) {
+          periodIndex++;
+        }
+      }
+
+      if (periodIndex >= periodsPerDay) {
         continue;
       }
 
       final dayName = orderedDayNames[dayIndex];
+
       final subjectId = (data['subject_id'] ?? '').toString();
       final facultyId = (data['faculty_id'] ?? '').toString();
       final roomId = (data['room_id'] ?? '').toString();
@@ -76,15 +102,17 @@ class TimetableFirestoreHelpers {
         'type': typ,
       };
     }
+
     return grid;
   }
 
-  /// Faculty schedule: subject, program, room + optional `type`.
+  /// Faculty View
   static Map<String, List<Map<String, dynamic>?>> buildFacultyViewGrid({
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
     required List<String> orderedDayNames,
     required int periodsPerDay,
     required TimetableResolvedNames names,
+    required List<int> breakIndexes,
   }) {
     final grid = emptyGridForDays(
       orderedDayNames: orderedDayNames,
@@ -93,13 +121,31 @@ class TimetableFirestoreHelpers {
 
     for (final doc in docs) {
       final data = doc.data();
-      final dayIndex = parseDayIndex(data['day'], orderedDayNames.length);
-      final periodIndex = parsePeriodIndex(data['period'], periodsPerDay);
-      if (dayIndex == null || periodIndex == null) {
+
+      final dayIndex =
+          parseDayIndex(data['day'], orderedDayNames.length);
+
+      final parsedPeriodIndex =
+          parsePeriodIndex(data['period'], periodsPerDay);
+
+      if (dayIndex == null || parsedPeriodIndex == null) {
+        continue;
+      }
+
+      int periodIndex = parsedPeriodIndex;
+
+      for (final breakIndex in breakIndexes) {
+        if (periodIndex >= breakIndex) {
+          periodIndex++;
+        }
+      }
+
+      if (periodIndex >= periodsPerDay) {
         continue;
       }
 
       final dayName = orderedDayNames[dayIndex];
+
       final subjectId = (data['subject_id'] ?? '').toString();
       final programId = (data['program_id'] ?? '').toString();
       final roomId = (data['room_id'] ?? '').toString();
@@ -112,6 +158,7 @@ class TimetableFirestoreHelpers {
         'type': typ,
       };
     }
+
     return grid;
   }
 }

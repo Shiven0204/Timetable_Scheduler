@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:timetable_scheduler/models/app_user_profile.dart';
 import 'package:timetable_scheduler/routes/app_routes.dart';
+import 'package:timetable_scheduler/services/basic_information_service.dart';
+import 'package:timetable_scheduler/models/schedule_slot.dart';
 import 'package:timetable_scheduler/services/timetable_firestore_helpers.dart';
 import 'package:timetable_scheduler/services/timetable_name_resolver.dart';
 import 'package:timetable_scheduler/services/timetable_service.dart';
@@ -21,6 +23,9 @@ class _FacultyScheduleScreenState extends State<FacultyScheduleScreen> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final TimetableService _timetableService = TimetableService();
   final TimetableNameResolver _nameResolver = TimetableNameResolver();
+  final BasicInformationService _basicInfoService = BasicInformationService();
+
+  List<String> _headers = [];
 
   List<String> _dayNames = List<String>.from(_defaultDays);
   List<Map<String, dynamic>> _faculties = [];
@@ -43,7 +48,53 @@ class _FacultyScheduleScreenState extends State<FacultyScheduleScreen> {
   @override
   void initState() {
     super.initState();
-    _loadFaculties();
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    await _loadHeaders();
+    await _loadFaculties();
+  }
+
+  Future<List<String>> _loadHeaders() async {
+    final info = await _basicInfoService.load();
+
+    if (info == null) {
+      return [];
+    }
+
+    final headers = <String>[];
+
+    for (final period in info.periods) {
+      headers.add(
+        '${ScheduleSlot.formatMinutes(period.startMinutes)}-'
+        '${ScheduleSlot.formatMinutes(period.endMinutes)}',
+      );
+
+      for (final br in info.breaks) {
+        if (br.startMinutes == period.endMinutes) {
+          headers.add(br.name.toUpperCase());
+        }
+      }
+    }
+
+    setState(() {
+      _headers = headers;
+    });
+
+    return headers;
+  }
+
+  List<int> _getBreakIndexes() {
+    final indexes = <int>[];
+
+    for (int i = 0; i < _headers.length; i++) {
+      if (_headers[i].toUpperCase().contains('BREAK')) {
+        indexes.add(i);
+      }
+    }
+
+    return indexes;
   }
 
   Future<void> _loadFaculties() async {
@@ -66,20 +117,22 @@ class _FacultyScheduleScreenState extends State<FacultyScheduleScreen> {
       final configDoc = await _db.collection('config').doc('timetable').get();
       if (!mounted) return;
 
-      final periods = (configDoc.data()?['periods_per_day'] as num?)?.toInt() ??
+      final periods =
+          (configDoc.data()?['periods_per_day'] as num?)?.toInt() ??
           (configDoc.data()?['periods'] as num?)?.toInt() ??
           6;
 
       setState(() {
         _faculties = faculties;
         _dayNames = dayNames.isNotEmpty ? dayNames : _defaultDays;
-        _periodsPerDay = periods;
+        _periodsPerDay = _headers.isNotEmpty ? _headers.length : periods;
         _grid = TimetableFirestoreHelpers.emptyGridForDays(
           orderedDayNames: _dayNames,
-          periodsPerDay: periods,
+          periodsPerDay: _headers.isNotEmpty ? _headers.length : periods,
         );
-        _selectedFacultyId =
-            faculties.isNotEmpty ? faculties.first['id'] as String : null;
+        _selectedFacultyId = faculties.isNotEmpty
+            ? faculties.first['id'] as String
+            : null;
       });
 
       if (_selectedFacultyId != null) {
@@ -153,6 +206,7 @@ class _FacultyScheduleScreenState extends State<FacultyScheduleScreen> {
         orderedDayNames: _dayNames,
         periodsPerDay: _periodsPerDay,
         names: names,
+        breakIndexes: _getBreakIndexes(),
       );
 
       setState(() {
@@ -198,8 +252,7 @@ class _FacultyScheduleScreenState extends State<FacultyScheduleScreen> {
           IconButton(
             tooltip: 'Calendar',
             icon: const Icon(Icons.calendar_month_outlined),
-            onPressed: () =>
-                Navigator.pushNamed(context, AppRoutes.calendar),
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.calendar),
           ),
           const LogoutAppBarAction(),
         ],
@@ -259,25 +312,18 @@ class _FacultyScheduleScreenState extends State<FacultyScheduleScreen> {
             ),
             const SizedBox(height: 12),
             if (_loadingFaculties || _loadingSchedule)
-              const Expanded(
-                child: Center(child: CircularProgressIndicator()),
-              )
+              const Expanded(child: Center(child: CircularProgressIndicator()))
             else if (_errorMessage != null)
               Expanded(
                 child: Center(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Text(
-                      _errorMessage!,
-                      textAlign: TextAlign.center,
-                    ),
+                    child: Text(_errorMessage!, textAlign: TextAlign.center),
                   ),
                 ),
               )
             else if (_selectedFacultyId == null)
-              const Expanded(
-                child: Center(child: Text('No faculty available')),
-              )
+              const Expanded(child: Center(child: Text('No faculty available')))
             else if (_isGridEmpty)
               const Expanded(
                 child: Center(
@@ -297,6 +343,7 @@ class _FacultyScheduleScreenState extends State<FacultyScheduleScreen> {
                       child: TimetableGrid(
                         days: _dayNames,
                         periodsPerDay: _periodsPerDay,
+                        headers: _headers,
                         grid: _grid,
                         mode: TimetableGridMode.facultyView,
                       ),

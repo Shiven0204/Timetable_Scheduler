@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:timetable_scheduler/models/app_user_profile.dart';
 import 'package:timetable_scheduler/routes/app_routes.dart';
+import 'package:timetable_scheduler/services/basic_information_service.dart';
+import 'package:timetable_scheduler/models/schedule_slot.dart';
 import 'package:timetable_scheduler/services/timetable_firestore_helpers.dart';
 import 'package:timetable_scheduler/services/timetable_name_resolver.dart';
 import 'package:timetable_scheduler/services/timetable_service.dart';
@@ -18,9 +20,12 @@ class ViewTimetableScreen extends StatefulWidget {
 }
 
 class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
+  final BasicInformationService _basicInfoService = BasicInformationService();
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final TimetableService _timetableService = TimetableService();
   final TimetableNameResolver _nameResolver = TimetableNameResolver();
+
+  List<String> _headers = [];
 
   List<String> _dayNames = List<String>.from(_defaultDays);
   List<Map<String, dynamic>> _programs = [];
@@ -43,7 +48,44 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
   @override
   void initState() {
     super.initState();
-    _loadPrograms();
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    await _loadHeaders();
+    await _loadPrograms();
+  }
+
+  Future<List<String>> _loadHeaders() async {
+    final info = await _basicInfoService.load();
+
+    if (info == null) {
+      return [];
+    }
+
+    final headers = <String>[];
+
+    for (final period in info.periods) {
+      headers.add(
+        '${ScheduleSlot.formatMinutes(period.startMinutes)}-'
+        '${ScheduleSlot.formatMinutes(period.endMinutes)}',
+      );
+
+      for (final br in info.breaks) {
+        if (br.startMinutes == period.endMinutes) {
+          headers.add(br.name.toUpperCase());
+        }
+      }
+    }
+
+    setState(() {
+      _headers = headers;
+    });
+
+    print('HEADERS = $_headers');
+    print('COUNT = ${_headers.length}');
+
+    return headers;
   }
 
   Future<void> _loadPrograms() async {
@@ -53,10 +95,7 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
     });
 
     try {
-      final programsSnapshot = await _firstNonEmpty([
-        'programs',
-        'Programs',
-      ]);
+      final programsSnapshot = await _firstNonEmpty(['programs', 'Programs']);
 
       if (!mounted) return;
 
@@ -70,20 +109,22 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
       final configDoc = await _db.collection('config').doc('timetable').get();
       if (!mounted) return;
 
-      final periods = (configDoc.data()?['periods_per_day'] as num?)?.toInt() ??
+      final periods =
+          (configDoc.data()?['periods_per_day'] as num?)?.toInt() ??
           (configDoc.data()?['periods'] as num?)?.toInt() ??
           6;
 
       setState(() {
         _programs = programs;
         _dayNames = dayNames.isNotEmpty ? dayNames : _defaultDays;
-        _periodsPerDay = periods;
+        _periodsPerDay = _headers.isNotEmpty ? _headers.length : periods;
         _grid = TimetableFirestoreHelpers.emptyGridForDays(
           orderedDayNames: _dayNames,
-          periodsPerDay: periods,
+          periodsPerDay: _headers.isNotEmpty ? _headers.length : periods,
         );
-        _selectedProgramId =
-            programs.isNotEmpty ? programs.first['id'] as String : null;
+        _selectedProgramId = programs.isNotEmpty
+            ? programs.first['id'] as String
+            : null;
       });
 
       if (_selectedProgramId != null) {
@@ -102,6 +143,19 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
         });
       }
     }
+  }
+
+  /// ADD THIS NEW METHOD
+  List<int> _getBreakIndexes() {
+    final indexes = <int>[];
+
+    for (int i = 0; i < _headers.length; i++) {
+      if (_headers[i].toUpperCase().contains('BREAK')) {
+        indexes.add(i);
+      }
+    }
+
+    return indexes;
   }
 
   Future<void> getTimetableByProgram(String programId) async {
@@ -156,6 +210,7 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
         orderedDayNames: _dayNames,
         periodsPerDay: _periodsPerDay,
         names: names,
+        breakIndexes: _getBreakIndexes(),
       );
 
       setState(() {
@@ -201,8 +256,7 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
           IconButton(
             tooltip: 'Calendar',
             icon: const Icon(Icons.calendar_month_outlined),
-            onPressed: () =>
-                Navigator.pushNamed(context, AppRoutes.calendar),
+            onPressed: () => Navigator.pushNamed(context, AppRoutes.calendar),
           ),
           const LogoutAppBarAction(),
         ],
@@ -258,18 +312,13 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
             ),
             const SizedBox(height: 12),
             if (_loadingPrograms || _loadingTimetable)
-              const Expanded(
-                child: Center(child: CircularProgressIndicator()),
-              )
+              const Expanded(child: Center(child: CircularProgressIndicator()))
             else if (_errorMessage != null)
               Expanded(
                 child: Center(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Text(
-                      _errorMessage!,
-                      textAlign: TextAlign.center,
-                    ),
+                    child: Text(_errorMessage!, textAlign: TextAlign.center),
                   ),
                 ),
               )
@@ -296,6 +345,7 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
                       child: TimetableGrid(
                         days: _dayNames,
                         periodsPerDay: _periodsPerDay,
+                        headers: _headers,
                         grid: _grid,
                         mode: TimetableGridMode.programView,
                       ),

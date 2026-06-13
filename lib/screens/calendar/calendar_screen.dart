@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:timetable_scheduler/services/basic_information_service.dart';
+import 'package:timetable_scheduler/models/schedule_slot.dart';
 import 'package:timetable_scheduler/services/timetable_firestore_helpers.dart';
 import 'package:timetable_scheduler/services/timetable_name_resolver.dart';
 import 'package:timetable_scheduler/services/timetable_service.dart';
@@ -17,6 +19,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
   final TimetableService _timetableService = TimetableService();
   final TimetableNameResolver _nameResolver = TimetableNameResolver();
+  final BasicInformationService _basicInfoService = BasicInformationService();
+
+  List<String> _headers = [];
 
   List<String> _dayNames = List<String>.from(_defaultDays);
   List<Map<String, dynamic>> _programs = [];
@@ -39,7 +44,56 @@ class _CalendarScreenState extends State<CalendarScreen> {
   @override
   void initState() {
     super.initState();
-    _loadPrograms();
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    await _loadHeaders();
+    await _loadPrograms();
+  }
+
+  Future<List<String>> _loadHeaders() async {
+    final info = await _basicInfoService.load();
+
+    if (info == null) {
+      return [];
+    }
+
+    final headers = <String>[];
+
+    for (final period in info.periods) {
+      headers.add(
+        '${ScheduleSlot.formatMinutes(period.startMinutes)}-'
+        '${ScheduleSlot.formatMinutes(period.endMinutes)}',
+      );
+
+      for (final br in info.breaks) {
+        if (br.startMinutes == period.endMinutes) {
+          headers.add(br.name.toUpperCase());
+        }
+      }
+    }
+
+    setState(() {
+      _headers = headers;
+    });
+
+    print('HEADERS = $_headers');
+    print('COUNT = ${_headers.length}');
+
+    return headers;
+  }
+
+  List<int> _getBreakIndexes() {
+    final indexes = <int>[];
+
+    for (int i = 0; i < _headers.length; i++) {
+      if (_headers[i].toUpperCase().contains('BREAK')) {
+        indexes.add(i);
+      }
+    }
+
+    return indexes;
   }
 
   Future<void> _loadPrograms() async {
@@ -62,20 +116,22 @@ class _CalendarScreenState extends State<CalendarScreen> {
       final configDoc = await _db.collection('config').doc('timetable').get();
       if (!mounted) return;
 
-      final periods = (configDoc.data()?['periods_per_day'] as num?)?.toInt() ??
+      final periods =
+          (configDoc.data()?['periods_per_day'] as num?)?.toInt() ??
           (configDoc.data()?['periods'] as num?)?.toInt() ??
           6;
 
       setState(() {
         _programs = programs;
         _dayNames = dayNames.isNotEmpty ? dayNames : _defaultDays;
-        _periodsPerDay = periods;
+        _periodsPerDay = _headers.isNotEmpty ? _headers.length : periods;
         _grid = TimetableFirestoreHelpers.emptyGridForDays(
           orderedDayNames: _dayNames,
-          periodsPerDay: periods,
+          periodsPerDay: _headers.isNotEmpty ? _headers.length : periods,
         );
-        _selectedProgramId =
-            programs.isNotEmpty ? programs.first['id'] as String : null;
+        _selectedProgramId = programs.isNotEmpty
+            ? programs.first['id'] as String
+            : null;
       });
 
       if (_selectedProgramId != null) {
@@ -148,6 +204,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
         orderedDayNames: _dayNames,
         periodsPerDay: _periodsPerDay,
         names: names,
+        breakIndexes: _getBreakIndexes(),
       );
 
       setState(() {
@@ -189,9 +246,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Calendar'),
-      ),
+      appBar: AppBar(title: const Text('Calendar')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -254,10 +309,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 child: Center(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
-                    child: Text(
-                      _errorMessage!,
-                      textAlign: TextAlign.center,
-                    ),
+                    child: Text(_errorMessage!, textAlign: TextAlign.center),
                   ),
                 ),
               )
@@ -287,6 +339,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                       child: TimetableGrid(
                         days: _dayNames,
                         periodsPerDay: _periodsPerDay,
+                        headers: _headers,
                         grid: _grid,
                         mode: TimetableGridMode.programView,
                       ),
