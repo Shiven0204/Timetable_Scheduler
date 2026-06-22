@@ -13,10 +13,10 @@ class AddSubjectScreen extends StatefulWidget {
 }
 
 class _AddSubjectScreenState extends State<AddSubjectScreen> {
-
   final _subjectNameController = TextEditingController();
   final _shortNameController = TextEditingController();
   final _creditsController = TextEditingController();
+  List<Map<String, dynamic>> _subjects = [];
 
   final DatabaseService _dbService = DatabaseService();
 
@@ -31,6 +31,7 @@ class _AddSubjectScreenState extends State<AddSubjectScreen> {
     super.initState();
     _subjectNameController.addListener(_onNameChanged);
     _loadPrograms();
+    _loadSubjects();
   }
 
   void _onNameChanged() {
@@ -41,6 +42,24 @@ class _AddSubjectScreenState extends State<AddSubjectScreen> {
       selection: TextSelection.collapsed(offset: generated.length),
     );
   }
+
+  Future<void> _loadSubjects() async {
+  final snapshot = await FirebaseFirestore.instance
+      .collection('Subjects')
+      .orderBy('created_at', descending: true)
+      .get();
+
+  if (!mounted) return;
+
+  setState(() {
+    _subjects = snapshot.docs.map((doc) {
+      return {
+        'id': doc.id,
+        'subject_name': doc['subject_name'] ?? '',
+      };
+    }).toList();
+  });
+}
 
   Future<void> _loadPrograms() async {
     final snapshot = await FirebaseFirestore.instance
@@ -77,18 +96,18 @@ class _AddSubjectScreenState extends State<AddSubjectScreen> {
         shortName.isEmpty ||
         creditsText.isEmpty ||
         _selectedProgramId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Fill all fields')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Fill all fields')));
       return;
     }
 
     try {
       int credits = int.tryParse(creditsText) ?? 0;
       if (credits <= 0) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Enter valid credits')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Enter valid credits')));
         return;
       }
 
@@ -99,11 +118,13 @@ class _AddSubjectScreenState extends State<AddSubjectScreen> {
         isLab: _isLab,
         programId: _selectedProgramId!,
       );
+
+      await _loadSubjects();
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Subject saved')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Subject saved')));
 
       _subjectNameController.clear();
       _shortNameController.clear();
@@ -114,26 +135,24 @@ class _AddSubjectScreenState extends State<AddSubjectScreen> {
         _shortNameEdited = false;
         _selectedProgramId = null;
       });
-
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Add Subject'),
-      ),
+      appBar: AppBar(title: const Text('Add Subject')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: InstituteFormCard(
           title: 'Subject & lecture details',
-          subtitle: 'Credits drive default weekly frequency. Enable Lab means theory + lab session.',
+          subtitle:
+              'Credits drive default weekly frequency. Enable Lab means theory + lab session.',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -163,7 +182,9 @@ class _AddSubjectScreenState extends State<AddSubjectScreen> {
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Enable Lab'),
-                subtitle: const Text('Theory lectures + one weekly lab session'),
+                subtitle: const Text(
+                  'Theory lectures + one weekly lab session',
+                ),
                 value: _isLab,
                 onChanged: (value) {
                   setState(() {
@@ -182,8 +203,9 @@ class _AddSubjectScreenState extends State<AddSubjectScreen> {
                     items: _programs.map<DropdownMenuItem<String>>((p) {
                       return DropdownMenuItem<String>(
                         value: p['id'],
-                        child:
-                            Text('${p['program_name']} - ${p['branch_name']}'),
+                        child: Text(
+                          '${p['program_name']} - ${p['branch_name']}',
+                        ),
                       );
                     }).toList(),
                     onChanged: (value) {
@@ -202,6 +224,37 @@ class _AddSubjectScreenState extends State<AddSubjectScreen> {
                   child: const Text('Save subject'),
                 ),
               ),
+
+              const SizedBox(height: 32),
+
+              const Divider(),
+
+              const SizedBox(height: 16),
+
+              Text(
+                'Saved Subjects',
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+
+              const SizedBox(height: 12),
+              if (_subjects.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16),
+                  child: Text('No subjects added yet'),
+                )
+              else
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _subjects.length,
+                  itemBuilder: (context, index) {
+                    return ListTile(
+                      dense: true,
+                      leading: const Icon(Icons.book_outlined),
+                      title: Text(_subjects[index]['subject_name']),
+                    );
+                  },
+                ),
             ],
           ),
         ),
