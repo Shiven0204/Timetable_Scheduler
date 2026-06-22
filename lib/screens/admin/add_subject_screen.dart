@@ -17,6 +17,11 @@ class _AddSubjectScreenState extends State<AddSubjectScreen> {
   final _shortNameController = TextEditingController();
   final _creditsController = TextEditingController();
   List<Map<String, dynamic>> _subjects = [];
+  int _visibleSubjects = 5;
+  final _searchController = TextEditingController();
+  final Set<String> _selectedSubjectIds = {};
+
+  String _searchText = '';
 
   final DatabaseService _dbService = DatabaseService();
 
@@ -43,23 +48,45 @@ class _AddSubjectScreenState extends State<AddSubjectScreen> {
     );
   }
 
+  Future<void> _deleteSelectedSubjects() async {
+    try {
+      for (final id in _selectedSubjectIds) {
+        await FirebaseFirestore.instance
+            .collection('Subjects')
+            .doc(id)
+            .delete();
+      }
+
+      _selectedSubjectIds.clear();
+
+      await _loadSubjects();
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Selected subjects deleted')),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error: $e')));
+    }
+  }
+
   Future<void> _loadSubjects() async {
-  final snapshot = await FirebaseFirestore.instance
-      .collection('Subjects')
-      .orderBy('created_at', descending: true)
-      .get();
+    final snapshot = await FirebaseFirestore.instance
+        .collection('Subjects')
+        .orderBy('created_at', descending: true)
+        .get();
 
-  if (!mounted) return;
+    if (!mounted) return;
 
-  setState(() {
-    _subjects = snapshot.docs.map((doc) {
-      return {
-        'id': doc.id,
-        'subject_name': doc['subject_name'] ?? '',
-      };
-    }).toList();
-  });
-}
+    setState(() {
+      _subjects = snapshot.docs.map((doc) {
+        return {'id': doc.id, 'subject_name': doc['subject_name'] ?? ''};
+      }).toList();
+    });
+  }
 
   Future<void> _loadPrograms() async {
     final snapshot = await FirebaseFirestore.instance
@@ -84,6 +111,7 @@ class _AddSubjectScreenState extends State<AddSubjectScreen> {
     _subjectNameController.dispose();
     _shortNameController.dispose();
     _creditsController.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -145,6 +173,12 @@ class _AddSubjectScreenState extends State<AddSubjectScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final filteredSubjects = _subjects.where((subject) {
+      final name = subject['subject_name'].toString().toLowerCase();
+
+      return name.contains(_searchText.toLowerCase());
+    }).toList();
+
     return Scaffold(
       appBar: AppBar(title: const Text('Add Subject')),
       body: SingleChildScrollView(
@@ -231,29 +265,93 @@ class _AddSubjectScreenState extends State<AddSubjectScreen> {
 
               const SizedBox(height: 16),
 
-              Text(
-                'Saved Subjects',
-                style: Theme.of(context).textTheme.titleMedium,
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Recently Added Subjects',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+
+                  if (_selectedSubjectIds.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.delete),
+                      tooltip: 'Delete Selected',
+                      onPressed: _deleteSelectedSubjects,
+                    ),
+                ],
               ),
 
               const SizedBox(height: 12),
-              if (_subjects.isEmpty)
-                const Padding(
+
+              TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search Subject',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    _searchText = value;
+                    _visibleSubjects = 5;
+                  });
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              const SizedBox(height: 12),
+              if (filteredSubjects.isEmpty)
+                Padding(
                   padding: EdgeInsets.symmetric(vertical: 16),
-                  child: Text('No subjects added yet'),
+                  child: Text(
+                    _searchText.isEmpty
+                        ? 'No subjects added yet'
+                        : 'No matching subjects found',
+                  ),
                 )
               else
                 ListView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  itemCount: _subjects.length,
+                  itemCount: filteredSubjects.length < _visibleSubjects
+                      ? filteredSubjects.length
+                      : _visibleSubjects,
                   itemBuilder: (context, index) {
-                    return ListTile(
+                    final subject = filteredSubjects[index];
+                    final id = subject['id'];
+
+                    return CheckboxListTile(
                       dense: true,
-                      leading: const Icon(Icons.book_outlined),
-                      title: Text(_subjects[index]['subject_name']),
+                      value: _selectedSubjectIds.contains(id),
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: Text(subject['subject_name']),
+                      secondary: const Icon(Icons.book_outlined),
+                      onChanged: (selected) {
+                        setState(() {
+                          if (selected ?? false) {
+                            _selectedSubjectIds.add(id);
+                          } else {
+                            _selectedSubjectIds.remove(id);
+                          }
+                        });
+                      },
                     );
                   },
+                ),
+              if (filteredSubjects.length > _visibleSubjects)
+                Center(
+                  child: TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _visibleSubjects += 5;
+                      });
+                    },
+                    child: const Text('Load More'),
+                  ),
                 ),
             ],
           ),
