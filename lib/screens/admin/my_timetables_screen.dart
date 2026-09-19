@@ -235,6 +235,7 @@ class _MyTimetablesScreenState extends State<MyTimetablesScreen> {
                       .toString()
                       .trim();
 
+                  // ignore: unused_local_variable
                   final sessionName = (data['session_name'] ?? '')
                       .toString()
                       .trim();
