@@ -16,8 +16,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _auth = FirebaseAuth.instance;
-  final _authService = AuthService();
+  FirebaseAuth get _auth => FirebaseAuth.instance;
+  AuthService get _authService => AuthService(auth: _auth);
 
   bool _loading = false;
   bool _obscurePassword = true;
@@ -40,9 +40,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   void _showSnack(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _onLogin() async {
@@ -140,8 +140,9 @@ class _LoginScreenState extends State<LoginScreen> {
                           Container(
                             padding: const EdgeInsets.all(18),
                             decoration: BoxDecoration(
-                              color: scheme.primaryContainer
-                                  .withValues(alpha: 0.35),
+                              color: scheme.primaryContainer.withValues(
+                                alpha: 0.35,
+                              ),
                               shape: BoxShape.circle,
                             ),
                             child: Icon(
@@ -182,16 +183,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                 borderRadius: BorderRadius.circular(18),
                                 boxShadow: [
                                   BoxShadow(
-                                    color:
-                                        Colors.black.withValues(alpha: 0.08),
+                                    color: Colors.black.withValues(alpha: 0.08),
                                     blurRadius: 10,
                                     offset: const Offset(0, 4),
                                   ),
                                 ],
                               ),
                               child: Column(
-                                crossAxisAlignment:
-                                    CrossAxisAlignment.stretch,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
                                   const Text(
                                     'Sign in',
@@ -208,8 +207,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     autocorrect: false,
                                     textInputAction: TextInputAction.next,
                                     enabled: !_loading,
-                                    decoration:
-                                        _inputDecoration('Email *'),
+                                    decoration: _inputDecoration('Email *'),
                                     validator: (value) {
                                       final v = value?.trim() ?? '';
                                       if (v.isEmpty) {
@@ -278,8 +276,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                           ? const SizedBox(
                                               height: 22,
                                               width: 22,
-                                              child:
-                                                  CircularProgressIndicator(
+                                              child: CircularProgressIndicator(
                                                 strokeWidth: 2,
                                               ),
                                             )

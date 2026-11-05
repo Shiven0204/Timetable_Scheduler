@@ -74,12 +74,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
       }
     }
 
+    if (!mounted) return headers;
+
     setState(() {
       _headers = headers;
     });
-
-    print('HEADERS = $_headers');
-    print('COUNT = ${_headers.length}');
 
     return headers;
   }

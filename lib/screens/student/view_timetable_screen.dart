@@ -78,12 +78,11 @@ class _ViewTimetableScreenState extends State<ViewTimetableScreen> {
       }
     }
 
+    if (!mounted) return headers;
+
     setState(() {
       _headers = headers;
     });
-
-    print('HEADERS = $_headers');
-    print('COUNT = ${_headers.length}');
 
     return headers;
   }

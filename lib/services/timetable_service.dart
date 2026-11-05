@@ -37,6 +37,7 @@ class TimetableService {
       return [];
     }
   }
+
   Future<List<Map<String, dynamic>>> getSubjectsByProgram(
     String programId,
   ) async {
@@ -163,6 +164,28 @@ class TimetableService {
       return {};
     }
   }
+
+  Map<String, dynamic> _createEmptyGridFromPreparedData(
+    Map<String, dynamic> timetableData,
+  ) {
+    final programs = (timetableData['programs'] as Map<String, dynamic>?) ?? {};
+    final days =
+        (timetableData['orderedDayNames'] as List<dynamic>?)
+            ?.map((day) => day.toString())
+            .toList(growable: false) ??
+        _buildDayNames(5);
+    final config = (timetableData['config'] as Map<String, dynamic>?) ?? {};
+    final periodsPerDay = (config['periods_per_day'] as num?)?.toInt() ?? 6;
+
+    return {
+      for (final programId in programs.keys)
+        programId: {
+          for (final day in days)
+            day: List<dynamic>.filled(periodsPerDay, null),
+        },
+    };
+  }
+
   Future<Map<String, dynamic>> scheduleLabs(
     Map<String, dynamic> timetable,
     Map<String, dynamic> timetableData,
@@ -322,7 +345,7 @@ class TimetableService {
   Future<Map<String, dynamic>> scheduleLabsFromPreparedData() async {
     final timetableData = await prepareTimetableData();
 
-    final emptyGrid = await createEmptyTimetableGrid();
+    final emptyGrid = _createEmptyGridFromPreparedData(timetableData);
 
     return scheduleLabs(emptyGrid, timetableData);
   }
@@ -502,7 +525,7 @@ class TimetableService {
 
     final timetableData = await prepareTimetableData();
 
-    final emptyGrid = await createEmptyTimetableGrid();
+    final emptyGrid = _createEmptyGridFromPreparedData(timetableData);
 
     final withLabs = await scheduleLabs(emptyGrid, timetableData);
 
@@ -518,6 +541,7 @@ class TimetableService {
 
     return result;
   }
+
   Future<List<String>> getWorkingDayNames() async {
     final config = await getConfig();
 
@@ -525,6 +549,7 @@ class TimetableService {
 
     return _buildDayNames(n);
   }
+
   Future<void> persistNestedTimetableToFirestore(
     Map<String, dynamic> timetable, {
     required String timetableName,
@@ -594,6 +619,7 @@ class TimetableService {
       sessionName: sessionName,
     );
   }
+
   Future<Map<String, dynamic>> prepareTimetableData() async {
     final timetableData = <String, dynamic>{};
 
@@ -605,6 +631,10 @@ class TimetableService {
       final rooms = await getRooms();
 
       final config = await getConfig();
+
+      final allSubjects = (await _getDocsFromCandidates(
+        _subjectCollections,
+      )).map((doc) => {'id': doc.id, ...doc.data()}).toList(growable: false);
 
       final workingDays = (config['working_days_per_week'] as int?) ?? 5;
 
@@ -619,7 +649,9 @@ class TimetableService {
           continue;
         }
 
-        final subjects = await getSubjectsByProgram(programId);
+        final subjects = allSubjects
+            .where((subject) => (subject['program_id'] ?? '') == programId)
+            .toList(growable: false);
 
         if (subjects.isEmpty) {
           dev.log(
@@ -789,6 +821,7 @@ class TimetableService {
       };
     }
   }
+
   Future<void> generateTimetable() async {
     final programs = await _fetchPrograms();
 
@@ -995,6 +1028,7 @@ class TimetableService {
 
     return false;
   }
+
   bool _placeTheory({
     required _Task task,
     required int days,
@@ -1145,6 +1179,7 @@ class TimetableService {
 
     return extended;
   }
+
   Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
   _getDocsFromCandidates(List<String> collections) async {
     for (final collection in collections) {
@@ -1166,7 +1201,8 @@ class TimetableService {
 
     return [];
   }
-   Map<String, Map<String, dynamic>> _roomDocByIdMap(List<dynamic> rooms) {
+
+  Map<String, Map<String, dynamic>> _roomDocByIdMap(List<dynamic> rooms) {
     final out = <String, Map<String, dynamic>>{};
 
     for (final raw in rooms) {
@@ -1199,6 +1235,7 @@ class TimetableService {
 
     return out;
   }
+
   Map<String, dynamic>? _mappingRowForSubjectProgram({
     required List<Map<String, dynamic>> mappings,
     required String subjectId,
@@ -1220,6 +1257,7 @@ class TimetableService {
 
     return found;
   }
+
   int _normalizedTheoryFrequency({
     required int? rawTheoryFrequency,
     required bool isLabCourse,
@@ -1251,6 +1289,7 @@ class TimetableService {
 
     return credits < 0 ? 0 : credits;
   }
+
   List<int> _evenlySpacedDayIndices({
     required int dayCount,
     required int sessionCount,
@@ -1423,6 +1462,7 @@ class TimetableService {
 
     schedule[id]![day]!.add(period);
   }
+
   void _buildOccupiedSchedulesFromTimetable({
     required Map<String, dynamic> timetable,
     required Map<String, Map<String, Set<int>>> facultySchedule,
@@ -1811,8 +1851,7 @@ class TimetableService {
         'Existing timetable found. Reusing timetableId=$timetableId',
         name: 'TimetableService',
       );
-    }
-    else {
+    } else {
       final newDoc = await _db.collection('timetable_config').add({
         'document_type': 'timetable',
         'timetable_name': timetableName,
@@ -1880,6 +1919,7 @@ class _Task {
   final String subjectId;
   final bool isLab;
 }
+
 class _Slot {
   const _Slot({
     required this.subjectId,

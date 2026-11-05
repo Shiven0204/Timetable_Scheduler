@@ -42,6 +42,7 @@ class _AuthGateState extends State<AuthGate> {
   Future<void> _onAuthChanged(User? user) async {
     dev.log('authStateChanged uid=${user?.uid}', name: 'AuthGate');
 
+    if (!mounted) return;
     setState(() {
       _user = user;
       _profileResult = null;
@@ -49,6 +50,7 @@ class _AuthGateState extends State<AuthGate> {
     });
 
     if (user == null) {
+      if (!mounted) return;
       setState(() => _loadingProfile = false);
       return;
     }
@@ -76,9 +78,7 @@ class _AuthGateState extends State<AuthGate> {
       case AppUserProfile.roleStudent:
         return ViewTimetableScreen(profile: profile);
       default:
-        return MissingProfileScreen(
-          message: 'Invalid role "${profile.role}".',
-        );
+        return MissingProfileScreen(message: 'Invalid role "${profile.role}".');
     }
   }
 
@@ -89,9 +89,7 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     if (_loadingProfile || _profileResult == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     final result = _profileResult!;
@@ -100,7 +98,8 @@ class _AuthGateState extends State<AuthGate> {
     }
 
     return MissingProfileScreen(
-      message: result.message ??
+      message:
+          result.message ??
           'Your account is not configured. Contact an administrator.',
     );
   }
